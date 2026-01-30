@@ -76,3 +76,5 @@ else:
 st.header("📋 Estado del Personal")
 
 for pid, nombre, estado in personal:
+    st.write(f"• **{nombre}** → {estado}")
+
