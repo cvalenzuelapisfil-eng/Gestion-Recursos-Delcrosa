@@ -8,7 +8,6 @@ def obtener_personal():
     conn.close()
     return data
 
-
 def marcar_no_disponible(personal_id):
     conn = conectar()
     c = conn.cursor()
@@ -19,7 +18,6 @@ def marcar_no_disponible(personal_id):
     conn.commit()
     conn.close()
 
-
 def marcar_disponible(personal_id):
     conn = conectar()
     c = conn.cursor()
@@ -29,4 +27,3 @@ def marcar_disponible(personal_id):
     )
     conn.commit()
     conn.close()
-

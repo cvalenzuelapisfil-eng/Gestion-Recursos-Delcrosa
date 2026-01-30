@@ -1,5 +1,5 @@
 import streamlit as st
-from database import crear_tablas
+from database import crear_tablas_y_seed
 from logic import obtener_personal, marcar_disponible, marcar_no_disponible
 
 st.set_page_config(
@@ -7,7 +7,8 @@ st.set_page_config(
     layout="wide"
 )
 
-crear_tablas()
+# 🔥 ESTO SOLUCIONA TODO
+crear_tablas_y_seed()
 
 st.title("👷 Gestión de Personal")
 
@@ -32,3 +33,4 @@ for pid, nombre, cargo, area, disponible in personal:
         if col5.button("Liberar", key=f"l{pid}"):
             marcar_disponible(pid)
             st.experimental_rerun()
+
