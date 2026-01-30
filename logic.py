@@ -1,18 +1,19 @@
-import pandas as pd
 from database import get_connection
 
-def obtener_proyectos():
+def agregar_personal(codigo, nombre, rol, disponible):
     conn = get_connection()
-    df = pd.read_sql("SELECT * FROM proyectos", conn)
-    conn.close()
-    return df
-
-def insertar_proyecto(codigo, nombre, estado, inicio, fin):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO proyectos (codigo, nombre, estado, fecha_inicio, fecha_fin) VALUES (?,?,?,?,?)",
-        (codigo, nombre, estado, inicio, fin)
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO personal (codigo, nombre, rol, disponible) VALUES (?,?,?,?)",
+        (codigo, nombre, rol, int(disponible))
     )
     conn.commit()
     conn.close()
+
+def listar_personal():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, codigo, nombre, rol, disponible FROM personal")
+    rows = c.fetchall()
+    conn.close()
+    return rows

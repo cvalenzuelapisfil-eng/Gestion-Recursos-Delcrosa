@@ -1,42 +1,19 @@
 import streamlit as st
-import pandas as pd
-from database import init_db
-from logic import obtener_proyectos, insertar_proyecto
+from logic import agregar_personal, listar_personal
 
-st.set_page_config(page_title="Gestión de Recursos", layout="wide")
+st.subheader("👷 Gestión de Personal")
 
-init_db()
-
-st.title("📊 Gestión de Proyectos y Recursos")
-
-with st.form("nuevo_proyecto"):
-    st.subheader("➕ Nuevo Proyecto")
-
-    codigo = st.text_input("Código del proyecto")
-    nombre = st.text_input("Nombre del proyecto")
-    estado = st.selectbox(
-        "Estado",
-        ["Por confirmar", "Confirmado", "Cancelado", "Reprogramado", "Postergado"]
-    )
-    inicio = st.date_input("Fecha inicio")
-    fin = st.date_input("Fecha fin")
-
-    guardar = st.form_submit_button("Guardar proyecto")
+with st.form("form_personal"):
+    codigo = st.text_input("Código personal")
+    nombre = st.text_input("Nombre")
+    rol = st.selectbox("Rol", ["Técnico", "Supervisor", "Ingeniero"])
+    disponible = st.checkbox("Disponible", value=True)
+    guardar = st.form_submit_button("Agregar personal")
 
     if guardar:
-        insertar_proyecto(codigo, nombre, estado, str(inicio), str(fin))
-        st.success("Proyecto registrado correctamente")
+        agregar_personal(codigo, nombre, rol, disponible)
+        st.success("Personal agregado correctamente")
 
-st.divider()
-
-st.subheader("📋 Proyectos registrados")
-df = obtener_proyectos()
-
-if df.empty:
-    st.info("No hay proyectos aún")
-else:
-    st.dataframe(df, use_container_width=True)
-
-    conteo = df["estado"].value_counts()
-    st.subheader("📈 Estado de proyectos")
-    st.bar_chart(conteo)
+st.markdown("### 📋 Lista de personal")
+personal = listar_personal()
+st.table(personal)
