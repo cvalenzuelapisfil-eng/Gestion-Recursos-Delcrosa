@@ -10,6 +10,77 @@ from database import get_connection
 
 MAX_INTENTOS = 5
 MINUTOS_BLOQUEO = 10
+
+# =====================================================
+# USUARIOS (AÑADIDO)
+# =====================================================
+
+def obtener_usuarios():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, usuario, rol, activo
+        FROM usuarios
+        ORDER BY usuario
+    """, conn)
+    cerrar(conn)
+    return df
+
+
+def crear_usuario(usuario, password, rol):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO usuarios (usuario, password_hash, rol, activo)
+        VALUES (%s, %s, %s, TRUE)
+    """, (usuario, hash_password(password), rol))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+def cambiar_password(user_id, nueva_password):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE usuarios
+        SET password_hash = %s
+        WHERE id = %s
+    """, (hash_password(nueva_password), user_id))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+def cambiar_rol(user_id, nuevo_rol):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE usuarios
+        SET rol = %s
+        WHERE id = %s
+    """, (nuevo_rol, user_id))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+def cambiar_estado(user_id, activo):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE usuarios
+        SET activo = %s
+        WHERE id = %s
+    """, (activo, user_id))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
 # =====================================================
 # CRUD PROYECTOS (AÑADIDO)
 # =====================================================
