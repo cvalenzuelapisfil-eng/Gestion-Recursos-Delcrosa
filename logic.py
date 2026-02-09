@@ -372,6 +372,32 @@ def resumen_persona(nombre_persona):
     conn.close()
     return df
 
+# ==============================
+# MODIFICAR PROYECTO
+# ==============================
+
+def modificar_proyecto(proyecto_id, nombre, inicio, fin, confirmado, usuario):
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("""
+        UPDATE proyectos
+        SET nombre = %s,
+            inicio = %s,
+            fin = %s,
+            confirmado = %s
+        WHERE id = %s
+    """, (
+        nombre,
+        inicio,
+        fin,
+        bool(confirmado),
+        proyecto_id
+    ))
+
+    conn.commit()
+    conn.close()
+
 
 # ==============================
 # PERSONAL

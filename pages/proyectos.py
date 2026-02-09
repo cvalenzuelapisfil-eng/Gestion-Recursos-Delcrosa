@@ -98,8 +98,10 @@ with st.form("form_modificar"):
         )
         st.success("Proyecto actualizado")
         st.rerun()
-
-    if eliminar:
         
-        st.success("Proyecto eliminado")
-        st.rerun()
+if eliminar:
+    eliminar_proyecto(pid)
+    st.success("Proyecto eliminado")
+    st.rerun()
+
+
