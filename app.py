@@ -1,23 +1,18 @@
 import streamlit as st
-from logic import validar_usuario
-from logic import tiene_permiso
+from logic import validar_usuario, tiene_permiso, asegurar_sesion
 
-
+# =====================================================
+# CONFIG APP
+# =====================================================
 st.set_page_config(
     page_title="Gestión de Recursos",
     layout="wide"
 )
 
 # =====================================================
-# SESSION STATE
+# SESSION SEGURA (SIEMPRE PRIMERO)
 # =====================================================
-if "usuario" not in st.session_state:
-   st.session_state.usuario = user["usuario"]
-st.session_state.rol = user["rol"]
-st.session_state.usuario_id = user["id"]
-st.session_state.logueado = True
-
-
+asegurar_sesion()
 
 # =====================================================
 # LOGIN
@@ -33,42 +28,38 @@ def login():
             user = validar_usuario(usuario, password)
 
             if user:
-                st.session_state.user_id = user[0]
-                st.session_state.usuario = user[1]
-                st.session_state.rol = user[2]
+                user_id, username, rol = user
+
+                st.session_state.user_id = user_id
+                st.session_state.usuario = username
+                st.session_state.rol = rol
+                st.session_state.autenticado = True
+
+                st.success("Login correcto")
                 st.rerun()
             else:
-                st.error("Credenciales inválidas")
+                st.error("❌ Credenciales inválidas")
 
         except Exception as e:
             st.error("Error conectando con la base de datos")
             st.exception(e)
 
-
 # =====================================================
 # LOGOUT
 # =====================================================
 def logout():
-    st.session_state.usuario = None
-    st.session_state.rol = None
     st.session_state.user_id = None
+    st.session_state.usuario = None
+    st.session_state.rol = "publico"
+    st.session_state.autenticado = False
     st.rerun()
-
-# =====================================================
-# GUARDIÁN DE PERMISOS
-# =====================================================
-def permiso_requerido(permiso):
-    if not tiene_permiso(st.session_state.rol, permiso):
-        st.error("⛔ No tienes permiso para acceder a esta sección")
-        st.stop()
 
 # =====================================================
 # BLOQUEO TOTAL SIN LOGIN
 # =====================================================
-if not st.session_state.usuario:
+if not st.session_state.autenticado:
     login()
     st.stop()
-
 
 # =====================================================
 # SIDEBAR
@@ -95,14 +86,28 @@ if rol in ["admin", "gestor"]:
 # Calendario (todos)
 st.sidebar.page_link("pages/calendario_recursos.py", label="Calendario")
 
-
 # Usuarios (solo admin)
 if rol == "admin":
     st.sidebar.page_link("pages/usuarios.py", label="Usuarios")
-
 
 # =====================================================
 # PANTALLA PRINCIPAL
 # =====================================================
 st.title("📌 Sistema de Gestión de Recursos")
-st.write("Selecciona una opción en el menú lateral 👈")
+
+st.markdown(
+    """
+    Bienvenido al sistema.
+
+    Usa el menú lateral para navegar:
+
+    - 📊 **Dashboard**
+    - 📁 **Proyectos**
+    - 👷 **Asignaciones**
+    - 📅 **Calendario**
+    - 👤 **Usuarios (admin)**
+
+    ---
+    Sistema ejecutándose en la nube ☁️
+    """
+)
