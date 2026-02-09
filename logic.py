@@ -132,15 +132,15 @@ PERMISOS = {
         "editar_proyecto",
         "eliminar_proyecto",
         "asignar_personal",
-        "editar_personal",        # 👈 AÑADIR
-        "ver_auditoria"           # 👈 AÑADIR
+        "editar_personal",
+        "ver_auditoria"
     },
     "gestor": {
         "ver_dashboard",
         "crear_proyecto",
         "editar_proyecto",
         "asignar_personal",
-        "editar_personal"         # 👈 OPCIONAL
+        "editar_personal"
     },
     "usuario": {
         "ver_dashboard"
