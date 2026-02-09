@@ -18,19 +18,52 @@ def hash_password(password: str) -> str:
 
 def validar_usuario(usuario, password):
     conn = get_connection()
-    c = conn.cursor()
+    cur = conn.cursor()
 
-    c.execute("""
+    # HASH SHA256 IGUAL AL DE SUPABASE
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    cur.execute("""
         SELECT id, usuario, rol
         FROM usuarios
         WHERE usuario = %s
-          AND password_hash = %s
-          AND activo = TRUE
-    """, (usuario, hash_password(password)))
+        AND password_hash = %s
+        AND activo = true
+    """, (usuario, password_hash))
 
-    fila = c.fetchone()
+    user = cur.fetchone()
+    cur.close()
     conn.close()
-    return fila
+    return user
+# =====================================================
+# CALENDARIO RECURSOS
+# =====================================================
+
+import pandas as pd
+from database import get_connection
+
+
+def calendario_recursos(fecha_inicio, fecha_fin):
+    conn = get_connection()
+
+    query = """
+        SELECT 
+            pr.nombre AS "Proyecto",
+            pe.nombre AS "Personal",
+            a.fecha_inicio AS "Inicio",
+            a.fecha_fin AS "Fin"
+        FROM asignaciones a
+        JOIN proyectos pr ON a.proyecto_id = pr.id
+        JOIN personal pe ON a.personal_id = pe.id
+        WHERE a.fecha_fin >= %s
+          AND a.fecha_inicio <= %s
+        ORDER BY a.fecha_inicio
+    """
+
+    df = pd.read_sql(query, conn, params=(fecha_inicio, fecha_fin))
+    conn.close()
+
+    return df
 
 
 # ==============================
@@ -172,6 +205,13 @@ def kpi_personal():
 
     conn.close()
     return total, total - ocupados, ocupados
+
+def calendario_recursos():
+    """
+    Función placeholder para evitar error de import.
+    Luego puedes reemplazarla con tu lógica real.
+    """
+    return []
 
 
 def kpi_asignaciones():
