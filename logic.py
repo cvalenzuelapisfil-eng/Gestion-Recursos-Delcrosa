@@ -78,6 +78,135 @@ def sugerir_personal(inicio, fin):
     cerrar(conn)
     return df
 
+# =====================================================
+# DASHBOARD EXTRA
+# =====================================================
+
+def obtener_personal_dashboard():
+    conn = get_connection()
+    df = pd.read_sql("SELECT id, nombre FROM personal ORDER BY nombre", conn)
+    cerrar(conn)
+    return df
+
+
+def proyectos_gantt_por_persona(personal_id=None):
+    conn = get_connection()
+
+    if personal_id:
+        df = pd.read_sql("""
+            SELECT pr.nombre, a.inicio, a.fin, pr.confirmado
+            FROM asignaciones a
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.personal_id = %s
+              AND a.activa = TRUE
+              AND pr.eliminado = FALSE
+        """, conn, params=(personal_id,))
+    else:
+        df = pd.read_sql("""
+            SELECT pr.nombre, a.inicio, a.fin, pr.confirmado
+            FROM asignaciones a
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.activa = TRUE
+              AND pr.eliminado = FALSE
+        """, conn)
+
+    cerrar(conn)
+    return df
+
+
+def obtener_alertas_por_persona(personal_id=None):
+    conn = get_connection()
+
+    if personal_id:
+        df = pd.read_sql("""
+            SELECT COUNT(*) AS conflictos
+            FROM asignaciones
+            WHERE personal_id = %s
+              AND activa = TRUE
+        """, conn, params=(personal_id,))
+    else:
+        df = pd.read_sql("""
+            SELECT COUNT(*) AS conflictos
+            FROM asignaciones
+            WHERE activa = TRUE
+        """, conn)
+
+    cerrar(conn)
+
+    if df.iloc[0]["conflictos"] > 20:
+        return ["Alta carga de asignaciones"]
+    return []
+
+
+def kpi_proyectos():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM proyectos WHERE eliminado=FALSE AND estado='Activo'")
+    activos = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM proyectos WHERE eliminado=FALSE AND estado='Cerrado'")
+    cerrados = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return activos, cerrados
+
+
+def kpi_personal():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM personal")
+    total = cur.fetchone()[0]
+
+    cur.execute("""
+        SELECT COUNT(DISTINCT personal_id)
+        FROM asignaciones
+        WHERE activa=TRUE
+    """)
+    ocupados = cur.fetchone()[0]
+
+    disponibles = total - ocupados
+    cerrar(conn, cur)
+    return total, disponibles, ocupados
+
+
+def kpi_asignaciones():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM asignaciones WHERE activa=TRUE")
+    total = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return total
+
+
+def kpi_solapamientos():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM asignaciones a1
+        JOIN asignaciones a2
+          ON a1.personal_id = a2.personal_id
+         AND a1.id <> a2.id
+         AND a1.activa = TRUE
+         AND a2.activa = TRUE
+         AND (a1.inicio, a1.fin) OVERLAPS (a2.inicio, a2.fin)
+    """)
+    total = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return total
+
+
+def kpi_proyectos_confirmados():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM proyectos WHERE confirmado=TRUE AND eliminado=FALSE")
+    confirmados = cur.fetchone()[0]
+
+    cur.execute("SELECT COUNT(*) FROM proyectos WHERE confirmado=FALSE AND eliminado=FALSE")
+    no_confirmados = cur.fetchone()[0]
+
+    cerrar(conn, cur)
+    return confirmados, no_confirmados
+
+
 
 # =====================================================
 # ASIGNACIONES - GESTIÓN COMPLETA
