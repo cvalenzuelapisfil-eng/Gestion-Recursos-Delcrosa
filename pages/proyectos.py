@@ -1,4 +1,4 @@
-```python
+
 import streamlit as st
 import pandas as pd
 from logic import (
@@ -146,4 +146,4 @@ if eliminar:
     eliminar_proyecto(pid, st.session_state.user_id)
     st.success("Proyecto eliminado")
     st.rerun()
-```
+

@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import pandas as pd
 import io
@@ -132,4 +131,4 @@ st.download_button(
     file_name="historial_proyectos.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
-```
+
