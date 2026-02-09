@@ -82,4 +82,59 @@ if archivo:
 
         for _, fila in df.iterrows():
             nombre = fila["nombre"]
-            carg
+            cargo = fila["cargo"]
+            area = fila["area"]
+
+            c.execute("SELECT id FROM personal WHERE nombre=%s", (nombre,))
+            existe = c.fetchone()
+
+            if existe:
+                actualizar.append((cargo, area, nombre))
+            else:
+                insertar.append((nombre, cargo, area))
+
+        # =====================================================
+        # INSERTAR NUEVOS
+        # =====================================================
+        if insertar:
+            c.executemany("""
+                INSERT INTO personal (nombre, cargo, area)
+                VALUES (%s, %s, %s)
+            """, insertar)
+
+        # =====================================================
+        # ACTUALIZAR EXISTENTES
+        # =====================================================
+        if actualizar:
+            c.executemany("""
+                UPDATE personal
+                SET cargo=%s, area=%s
+                WHERE nombre=%s
+            """, actualizar)
+
+        conn.commit()
+
+        # =====================================================
+        # RESULTADO
+        # =====================================================
+        st.success(f"""
+        ✔️ Carga completada
+
+        • Insertados: {len(insertar)}  
+        • Actualizados: {len(actualizar)}
+        """)
+
+        registrar_auditoria(
+            st.session_state.user_id,
+            "CARGA_MASIVA",
+            "PERSONAL",
+            None,
+            f"Insertados={len(insertar)} Actualizados={len(actualizar)}"
+        )
+
+    except Exception as e:
+        st.error(f"❌ Error en carga masiva: {e}")
+
+    finally:
+        c.close()
+        conn.close()

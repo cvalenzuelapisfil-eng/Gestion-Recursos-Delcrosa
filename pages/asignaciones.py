@@ -33,15 +33,22 @@ st.title("👷 Asignación de Personal a Proyectos")
 # -----------------------------------------------------
 proyectos = obtener_proyectos()
 
-if not proyectos:
+if proyectos.empty:
+
     st.info("No hay proyectos disponibles")
     st.stop()
 
 proyecto = st.selectbox(
     "Proyecto",
-    proyectos,
-    format_func=lambda x: f"{x[1]} ({'Confirmado' if x[6] else 'No confirmado'})"
+    proyectos.to_dict("records"),
+    format_func=lambda x: f"{x['nombre']} ({'Confirmado' if x['confirmado'] else 'No confirmado'})"
 )
+
+proyecto_id = proyecto["id"]
+inicio_proyecto = proyecto["inicio"]
+fin_proyecto = proyecto["fin"]
+confirmado = proyecto["confirmado"]
+
 
 proyecto_id = proyecto[0]
 inicio_proyecto = proyecto[4]
