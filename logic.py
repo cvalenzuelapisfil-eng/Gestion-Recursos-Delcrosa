@@ -123,6 +123,36 @@ def eliminar_proyecto(proyecto_id):
     conn.commit()
     conn.close()
 
+# ==============================
+# PERSONAL DISPONIBLE
+# ==============================
+
+def obtener_personal_disponible(inicio, fin):
+    """
+    Devuelve personal que NO tiene asignaciones activas
+    en el rango de fechas indicado.
+    NO reemplaza ninguna función existente.
+    """
+
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT p.id, p.nombre
+        FROM personal p
+        WHERE p.id NOT IN (
+            SELECT a.personal_id
+            FROM asignaciones a
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.activa = TRUE
+              AND pr.eliminado = FALSE
+              AND a.inicio <= %s
+              AND a.fin >= %s
+        )
+        ORDER BY p.nombre
+    """, conn, params=(fin, inicio))
+
+    conn.close()
+    return df.values.tolist()
+
 
 # ==============================
 # PERSONAL
