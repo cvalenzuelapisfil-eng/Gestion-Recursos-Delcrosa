@@ -2,19 +2,37 @@ import streamlit as st
 from datetime import date
 
 from logic import (
+    tiene_permiso,
     obtener_proyectos,
     obtener_personal_disponible,
     obtener_personal,
     asignar_personal,
-    hay_solapamiento
+    hay_solapamiento,
+    sugerir_personal,
+    registrar_auditoria
 )
 
+# -----------------------------------------------------
+# 🔐 SEGURIDAD
+# -----------------------------------------------------
+if "usuario" not in st.session_state or not st.session_state.usuario:
+    st.error("Sesión no válida")
+    st.stop()
+
+if not tiene_permiso(st.session_state.rol, "asignar_personal"):
+    st.error("⛔ No tienes permiso para asignar personal")
+    st.stop()
+
+# -----------------------------------------------------
+# CONFIG
+# -----------------------------------------------------
 st.set_page_config(page_title="Asignaciones", layout="wide")
 st.title("👷 Asignación de Personal a Proyectos")
 
-# =====================================================
+
+# -----------------------------------------------------
 # SELECCIÓN DE PROYECTO
-# =====================================================
+# -----------------------------------------------------
 proyectos = obtener_proyectos()
 
 if not proyectos:
@@ -34,10 +52,52 @@ confirmado = proyecto[6]
 
 st.info(f"📅 Fechas del proyecto: {inicio_proyecto} → {fin_proyecto}")
 
-# =====================================================
-# SELECCIÓN DE PERSONAL
-# =====================================================
-st.subheader("👥 Selección de personal")
+
+# -----------------------------------------------------
+# 🤖 SUGERENCIA AUTOMÁTICA
+# -----------------------------------------------------
+st.subheader("🤖 Sugerencia automática")
+
+sugeridos = sugerir_personal(inicio_proyecto, fin_proyecto)
+
+auto_ids = []
+
+if not sugeridos.empty:
+    for _, r in sugeridos.iterrows():
+        st.write(f"• {r['nombre']} (carga: {r['carga']})")
+        auto_ids.append(int(r["id"]))
+else:
+    st.info("No hay sugerencias disponibles")
+
+# AUTO-ASIGNAR
+if auto_ids:
+    if st.button("⚡ Auto-asignar sugeridos"):
+
+        asignar_personal(
+            proyecto_id,
+            auto_ids,
+            inicio_proyecto,
+            fin_proyecto,
+            st.session_state.user_id
+        )
+
+        registrar_auditoria(
+            st.session_state.user_id,
+            "ASIGNAR",
+            "ASIGNACION",
+            proyecto_id,
+            f"Auto-asignación de {len(auto_ids)} personas"
+        )
+
+        st.success("Asignación automática realizada")
+        st.rerun()
+
+
+# -----------------------------------------------------
+# SELECCIÓN MANUAL
+# -----------------------------------------------------
+st.divider()
+st.subheader("👥 Selección manual de personal")
 
 personal = obtener_personal()
 
@@ -45,6 +105,7 @@ if not personal:
     st.warning("No hay personal registrado")
     st.stop()
 
+# Evitar duplicados
 personal_map = {f"{p[1]}": p[0] for p in personal}
 nombres = list(personal_map.keys())
 
@@ -58,9 +119,10 @@ if not seleccionados:
 
 ids_seleccionados = [personal_map[n] for n in seleccionados]
 
-# =====================================================
-# ALERTA PREVENTIVA
-# =====================================================
+
+# -----------------------------------------------------
+# VALIDACIÓN DE CARGA
+# -----------------------------------------------------
 st.subheader("⚠️ Validación de carga")
 
 conflictos = []
@@ -91,14 +153,27 @@ if conflictos:
         if not continuar:
             st.stop()
 
-# =====================================================
-# CONFIRMAR ASIGNACIÓN
-# =====================================================
-if st.button("✅ Asignar personal"):
+
+# -----------------------------------------------------
+# CONFIRMAR ASIGNACIÓN MANUAL
+# -----------------------------------------------------
+if st.button("✅ Asignar personal seleccionado"):
+
     asignar_personal(
         proyecto_id,
         ids_seleccionados,
         inicio_proyecto,
-        fin_proyecto
+        fin_proyecto,
+        st.session_state.user_id
     )
+
+    registrar_auditoria(
+        st.session_state.user_id,
+        "ASIGNAR",
+        "ASIGNACION",
+        proyecto_id,
+        f"Asignación manual de {len(ids_seleccionados)} personas"
+    )
+
     st.success("Personal asignado correctamente")
+    st.rerun()

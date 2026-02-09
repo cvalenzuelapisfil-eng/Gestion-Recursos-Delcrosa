@@ -2,11 +2,26 @@ import streamlit as st
 import pandas as pd
 import io
 from database import get_connection
+from logic import tiene_permiso, registrar_auditoria
 
+# =====================================================
+# 🔐 SEGURIDAD
+# =====================================================
+if "usuario" not in st.session_state:
+    st.error("Sesión inválida")
+    st.stop()
+
+if not tiene_permiso(st.session_state.rol, "editar_personal"):
+    st.error("⛔ No tienes permisos para carga masiva")
+    st.stop()
+
+usuario = st.session_state.usuario
+
+# =====================================================
+# CONFIG
+# =====================================================
 st.set_page_config(page_title="Carga Masiva de Personal", layout="wide")
 st.title("📥📤 Carga Masiva de Personal (Excel)")
-
-usuario = st.session_state.get("usuario", "sistema")
 
 conn = get_connection()
 c = conn.cursor()
@@ -43,10 +58,7 @@ st.divider()
 # =====================================================
 st.subheader("📥 Importar / Actualizar desde Excel")
 
-archivo = st.file_uploader(
-    "Selecciona archivo Excel",
-    type=["xlsx"]
-)
+archivo = st.file_uploader("Selecciona archivo Excel", type=["xlsx"])
 
 if archivo:
     try:
@@ -54,10 +66,18 @@ if archivo:
 
         columnas = {"nombre", "cargo", "area"}
         if not columnas.issubset(df.columns):
-            st.error("El Excel debe tener las columnas: nombre, cargo, area")
+            st.error("El Excel debe tener columnas: nombre, cargo, area")
             st.stop()
 
+        # -------------------------------------------------
+        # LIMPIEZA DE DATOS
+        # -------------------------------------------------
         df["nombre"] = df["nombre"].astype(str).str.strip()
+        df["cargo"] = df["cargo"].astype(str).str.strip()
+        df["area"] = df["area"].astype(str).str.strip()
+
+        df = df[df["nombre"] != ""]
+        df = df.drop_duplicates(subset=["nombre"], keep="first")
 
         insertar = []
         actualizar = []
@@ -65,13 +85,8 @@ if archivo:
 
         for _, fila in df.iterrows():
             nombre = fila["nombre"]
-
-            if not nombre:
-                omitir.append(fila)
-                continue
-
-            cargo = None if pd.isna(fila["cargo"]) else str(fila["cargo"]).strip()
-            area = None if pd.isna(fila["area"]) else str(fila["area"]).strip()
+            cargo = fila["cargo"] if fila["cargo"] else None
+            area = fila["area"] if fila["area"] else None
 
             c.execute(
                 "SELECT id, cargo, area FROM personal WHERE LOWER(nombre)=LOWER(%s)",
@@ -91,12 +106,12 @@ if archivo:
                 if cambios:
                     actualizar.append((pid, nombre, cambios))
                 else:
-                    omitir.append(fila)
+                    omitir.append(nombre)
             else:
                 insertar.append((nombre, cargo, area))
 
         # =====================================================
-        # RESUMEN PREVIO
+        # PREVIEW
         # =====================================================
         st.subheader("🧪 Resumen de carga")
 
@@ -105,20 +120,44 @@ if archivo:
         col2.metric("✏️ Actualizar", len(actualizar))
         col3.metric("⚠️ Omitidos", len(omitir))
 
+        if insertar:
+            st.write("### Nuevos registros")
+            st.dataframe(pd.DataFrame(insertar, columns=["nombre","cargo","area"]))
+
+        if actualizar:
+            cambios_preview = []
+            for _, nombre, cambios in actualizar:
+                for campo, (antes, despues) in cambios.items():
+                    cambios_preview.append({
+                        "Nombre": nombre,
+                        "Campo": campo,
+                        "Antes": antes,
+                        "Después": despues
+                    })
+            st.write("### Cambios detectados")
+            st.dataframe(pd.DataFrame(cambios_preview))
+
+        # =====================================================
+        # CONFIRMAR
+        # =====================================================
         if st.button("🚀 Confirmar carga"):
+
             # INSERTAR
             for nombre, cargo, area in insertar:
                 c.execute("""
                     INSERT INTO personal (nombre, cargo, area)
                     VALUES (%s, %s, %s)
+                    RETURNING id
                 """, (nombre, cargo, area))
+                pid = c.fetchone()[0]
 
-                pid = c.lastrowid
-                c.execute("""
-                    INSERT INTO personal_historial
-                    (personal_id, accion, campo, valor_nuevo, usuario)
-                    VALUES (%s, 'CARGA_MASIVA', 'registro', %s, %s)
-                """, (pid, nombre, usuario))
+                registrar_auditoria(
+                    st.session_state.user_id,
+                    "INSERT",
+                    "PERSONAL",
+                    pid,
+                    f"Carga masiva: {nombre}"
+                )
 
             # ACTUALIZAR
             for pid, nombre, cambios in actualizar:
@@ -127,16 +166,21 @@ if archivo:
                         f"UPDATE personal SET {campo}=%s WHERE id=%s",
                         (despues, pid)
                     )
-                    c.execute("""
-                        INSERT INTO personal_historial
-                        (personal_id, accion, campo, valor_anterior, valor_nuevo, usuario)
-                        VALUES (%s, 'CARGA_MASIVA', %s, %s, %s, %s)
-                    """, (pid, campo, antes, despues, usuario))
+
+                    registrar_auditoria(
+                        st.session_state.user_id,
+                        "UPDATE",
+                        "PERSONAL",
+                        pid,
+                        f"{campo}: {antes} → {despues}"
+                    )
 
             conn.commit()
             st.success("✅ Carga masiva completada correctamente")
+            st.rerun()
 
     except Exception as e:
+        conn.rollback()
         st.error(f"Error al procesar archivo: {e}")
 
 conn.close()

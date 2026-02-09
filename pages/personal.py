@@ -1,7 +1,22 @@
 import streamlit as st
 import pandas as pd
 from database import get_connection
+from logic import tiene_permiso, registrar_auditoria
 
+# -----------------------------------------------------
+# 🔐 SEGURIDAD
+# -----------------------------------------------------
+if "usuario" not in st.session_state or not st.session_state.usuario:
+    st.error("Sesión no válida")
+    st.stop()
+
+if not tiene_permiso(st.session_state.rol, "editar_personal"):
+    st.error("⛔ No tienes permisos para modificar personal")
+    st.stop()
+
+# -----------------------------------------------------
+# CONFIG
+# -----------------------------------------------------
 st.set_page_config(
     page_title="Estado y Gestión del Personal",
     layout="wide"
@@ -84,13 +99,47 @@ if not df.empty:
         guardar = st.form_submit_button("💾 Guardar cambios")
 
         if guardar:
+
+            nombre = nombre.strip()
+            cargo = cargo.strip()
+            area = area.strip()
+
+            # -------------------------------------------------
+            # VALIDACIONES
+            # -------------------------------------------------
+            if not nombre or not cargo or not area:
+                st.error("Todos los campos son obligatorios")
+                st.stop()
+
+            if (
+                nombre == persona["nombre"]
+                and cargo == persona["cargo"]
+                and area == persona["area"]
+            ):
+                st.info("No se detectaron cambios")
+                st.stop()
+
+            # -------------------------------------------------
+            # UPDATE
+            # -------------------------------------------------
             c = conn.cursor()
             c.execute("""
                 UPDATE personal
                 SET nombre = %s, cargo = %s, area = %s
                 WHERE id = %s
-            """, (nombre.strip(), cargo.strip(), area.strip(), persona_id))
+            """, (nombre, cargo, area, persona_id))
             conn.commit()
+
+            # -------------------------------------------------
+            # 📝 AUDITORÍA
+            # -------------------------------------------------
+            registrar_auditoria(
+                st.session_state.user_id,
+                "EDITAR",
+                "PERSONAL",
+                persona_id,
+                f"Actualizó datos: {persona['nombre']} → {nombre}"
+            )
 
             st.success("✅ Datos del personal actualizados correctamente")
             st.rerun()

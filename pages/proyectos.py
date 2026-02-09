@@ -4,16 +4,27 @@ from logic import (
     obtener_proyectos,
     crear_proyecto,
     modificar_proyecto,
-    eliminar_proyecto
+    eliminar_proyecto,
+    tiene_permiso
 )
 
 st.set_page_config(page_title="Proyectos", layout="wide")
+
+# =====================================================
+# BLOQUEO POR PERMISOS
+# =====================================================
+if not tiene_permiso(st.session_state.rol, "crear_proyecto"):
+    st.error("⛔ No tienes permiso para acceder a Proyectos")
+    st.stop()
+
 st.title("📁 Gestión de Proyectos")
+
 
 # ===============================
 # FORMULARIO CREAR PROYECTO
 # ===============================
 with st.expander("➕ Crear nuevo proyecto"):
+
     with st.form("form_crear_proyecto"):
         nombre = st.text_input("Nombre del proyecto")
         inicio = st.date_input("Fecha inicio")
@@ -31,12 +42,13 @@ with st.expander("➕ Crear nuevo proyecto"):
                     inicio,
                     fin,
                     int(confirmado),
-                    st.session_state["usuario"]
+                    st.session_state["user_id"]   # 👈 usamos ID real
                 )
                 st.success("Proyecto creado correctamente")
                 st.rerun()
 
 st.divider()
+
 
 # ===============================
 # LISTADO DE PROYECTOS
@@ -45,12 +57,10 @@ st.subheader("📋 Proyectos registrados")
 
 proyectos = obtener_proyectos()
 
-# ✅ VALIDACIÓN CORRECTA
 if not proyectos:
     st.info("No hay proyectos registrados")
     st.stop()
 
-# Convertimos a DataFrame SOLO PARA LA VISTA
 df = pd.DataFrame(
     proyectos,
     columns=["id", "nombre", "codigo", "estado", "inicio", "fin", "confirmado"]
@@ -59,6 +69,7 @@ df = pd.DataFrame(
 st.dataframe(df, use_container_width=True, hide_index=True)
 
 st.divider()
+
 
 # ===============================
 # MODIFICAR / ELIMINAR
@@ -72,6 +83,7 @@ proyecto_sel = st.selectbox(
 )
 
 pid, nombre, codigo, estado, inicio, fin, confirmado = proyecto_sel
+
 
 with st.form("form_modificar"):
     nuevo_nombre = st.text_input("Nombre", nombre)
@@ -87,21 +99,35 @@ with st.form("form_modificar"):
     with col2:
         eliminar = st.form_submit_button("🗑️ Eliminar proyecto")
 
-    if guardar:
-        modificar_proyecto(
-            pid,
-            nuevo_nombre,
-            nuevo_inicio,
-            nuevo_fin,
-            int(nuevo_confirmado),
-            st.session_state["usuario"]
-        )
-        st.success("Proyecto actualizado")
-        st.rerun()
-        
-if eliminar:
-    eliminar_proyecto(pid)
-    st.success("Proyecto eliminado")
+
+# ===============================
+# GUARDAR CAMBIOS
+# ===============================
+if guardar:
+    if not tiene_permiso(st.session_state.rol, "editar_proyecto"):
+        st.error("⛔ No tienes permiso para editar")
+        st.stop()
+
+    modificar_proyecto(
+        pid,
+        nuevo_nombre,
+        nuevo_inicio,
+        nuevo_fin,
+        int(nuevo_confirmado),
+        st.session_state["user_id"]
+    )
+    st.success("Proyecto actualizado")
     st.rerun()
 
 
+# ===============================
+# ELIMINAR PROYECTO
+# ===============================
+if eliminar:
+    if not tiene_permiso(st.session_state.rol, "eliminar_proyecto"):
+        st.error("⛔ Solo administrador puede eliminar")
+        st.stop()
+
+    eliminar_proyecto(pid, st.session_state["user_id"])
+    st.success("Proyecto eliminado")
+    st.rerun()
