@@ -7,11 +7,12 @@ from logic import (
     asignar_personal,
     hay_solapamiento,
     sugerir_personal,
-    registrar_auditoria
+    registrar_auditoria,
+    obtener_carga_personal
 )
 
 # =====================================================
-# 🔐 SESIÓN GLOBAL
+# 🔐 SESIÓN
 # =====================================================
 asegurar_sesion()
 
@@ -19,18 +20,15 @@ if not st.session_state.autenticado:
     st.switch_page("app.py")
     st.stop()
 
-# =====================================================
-# 🔐 PERMISOS
-# =====================================================
 if not tiene_permiso(st.session_state.rol, "asignar_personal"):
-    st.error("⛔ No tienes permiso para asignar personal")
+    st.error("⛔ No tienes permiso")
     st.stop()
 
 # =====================================================
 # CONFIG
 # =====================================================
-st.set_page_config(page_title="Asignaciones", layout="wide")
-st.title("👷 Asignación de Personal a Proyectos")
+st.set_page_config(page_title="ERP ULTRA – Asignaciones", layout="wide")
+st.title("🧠 ERP ULTRA – Asignación Inteligente de Personal")
 
 # =====================================================
 # PROYECTOS
@@ -38,7 +36,7 @@ st.title("👷 Asignación de Personal a Proyectos")
 proyectos = obtener_proyectos()
 
 if proyectos.empty:
-    st.info("No hay proyectos disponibles")
+    st.info("No hay proyectos")
     st.stop()
 
 proyecto = st.selectbox(
@@ -48,113 +46,108 @@ proyecto = st.selectbox(
 )
 
 proyecto_id = proyecto["id"]
-inicio_proyecto = proyecto["inicio"]
-fin_proyecto = proyecto["fin"]
-confirmado = proyecto["confirmado"]
+inicio = proyecto["inicio"]
+fin = proyecto["fin"]
 
-st.info(f"📅 Fechas del proyecto: {inicio_proyecto} → {fin_proyecto}")
-
-# =====================================================
-# 🤖 SUGERENCIA AUTOMÁTICA
-# =====================================================
-st.subheader("🤖 Sugerencia automática")
-
-sugeridos = sugerir_personal(inicio_proyecto, fin_proyecto)
-auto_ids = []
-
-if not sugeridos.empty:
-    for _, r in sugeridos.iterrows():
-        st.write(f"• {r['nombre']} (carga: {r['carga']})")
-        auto_ids.append(int(r["id"]))
-else:
-    st.info("No hay sugerencias disponibles")
+st.info(f"📅 {inicio} → {fin}")
 
 # =====================================================
-# AUTO-ASIGNACIÓN
+# 🤖 MOTOR IA ERP ULTRA
 # =====================================================
-if auto_ids and st.button("⚡ Auto-asignar sugeridos"):
-    asignar_personal(
-        proyecto_id,
-        auto_ids,
-        inicio_proyecto,
-        fin_proyecto,
-        st.session_state.user_id
-    )
-
-    registrar_auditoria(
-        st.session_state.user_id,
-        "ASIGNAR",
-        "ASIGNACION",
-        proyecto_id,
-        f"Auto-asignación de {len(auto_ids)} personas"
-    )
-
-    st.success("Asignación automática realizada")
-    st.rerun()
-
-# =====================================================
-# SELECCIÓN MANUAL
-# =====================================================
-st.divider()
-st.subheader("👥 Selección manual de personal")
+st.subheader("🤖 Motor Inteligente")
 
 personal = obtener_personal()
 
-if personal.empty:
-    st.warning("No hay personal registrado")
-    st.stop()
-
-personal_map = dict(zip(personal["nombre"], personal["id"]))
-nombres = list(personal_map.keys())
-
-seleccionados = st.multiselect("Selecciona personal", nombres)
-
-if not seleccionados:
-    st.stop()
-
-ids_seleccionados = [personal_map[n] for n in seleccionados]
-
-# =====================================================
-# VALIDACIÓN SOLAPAMIENTOS
-# =====================================================
-st.subheader("⚠️ Validación de carga")
-
-conflictos = [
-    n for n in seleccionados
-    if hay_solapamiento(personal_map[n], inicio_proyecto, fin_proyecto)
+# Filtrar solo libres
+personal_libre = personal[
+    ~personal["id"].apply(lambda pid: hay_solapamiento(pid, inicio, fin))
 ]
 
-if conflictos:
-    st.error("🚨 Personal con asignaciones solapadas")
-    for c in conflictos:
-        st.write(f"• {c}")
+if personal_libre.empty:
+    st.warning("No hay personal libre en ese rango")
+    st.stop()
 
-    if confirmado:
-        st.warning("Proyecto confirmado → no permitido")
-        st.stop()
-    else:
-        if not st.checkbox("Continuar igualmente"):
-            st.stop()
+# Obtener carga actual (%)
+personal_libre["carga"] = personal_libre["id"].apply(obtener_carga_personal)
+
+# Orden inteligente → menor carga primero
+personal_optimo = personal_libre.sort_values(by="carga")
+
+st.write("### Personal óptimo disponible")
+
+for _, r in personal_optimo.iterrows():
+    color = "🟢" if r["carga"] < 70 else "🟡" if r["carga"] < 90 else "🔴"
+    st.write(f"{color} {r['nombre']} → Carga {r['carga']}%")
 
 # =====================================================
-# CONFIRMAR
+# ⚡ AUTO-OPTIMIZACIÓN TOTAL
 # =====================================================
-if st.button("✅ Asignar personal seleccionado"):
+st.divider()
+st.subheader("⚡ Auto Optimización ULTRA")
+
+cantidad = st.number_input(
+    "Cantidad de personal requerido",
+    min_value=1,
+    max_value=len(personal_optimo),
+    value=1
+)
+
+if st.button("🚀 Asignación Inteligente ULTRA"):
+    seleccion = personal_optimo.head(cantidad)
+
+    ids = seleccion["id"].tolist()
+
     asignar_personal(
         proyecto_id,
-        ids_seleccionados,
-        inicio_proyecto,
-        fin_proyecto,
+        ids,
+        inicio,
+        fin,
         st.session_state.user_id
     )
 
     registrar_auditoria(
         st.session_state.user_id,
-        "ASIGNAR",
+        "ASIGNACION_ULTRA",
         "ASIGNACION",
         proyecto_id,
-        f"Asignación manual de {len(ids_seleccionados)} personas"
+        f"ERP ULTRA asignó {len(ids)} personas automáticamente"
     )
 
-    st.success("Personal asignado correctamente")
+    st.success("Asignación optimizada completada")
     st.rerun()
+
+# =====================================================
+# 👤 MODO MANUAL INTELIGENTE
+# =====================================================
+st.divider()
+st.subheader("👤 Selección Manual Inteligente")
+
+mapa = dict(zip(personal_optimo["nombre"], personal_optimo["id"]))
+
+seleccion_manual = st.multiselect(
+    "Selecciona personal (ordenado por menor carga)",
+    list(mapa.keys())
+)
+
+if seleccion_manual:
+    ids = [mapa[n] for n in seleccion_manual]
+
+    if st.button("✅ Asignar Manual Inteligente"):
+        asignar_personal(
+            proyecto_id,
+            ids,
+            inicio,
+            fin,
+            st.session_state.user_id
+        )
+
+        registrar_auditoria(
+            st.session_state.user_id,
+            "ASIGNACION_MANUAL_ULTRA",
+            "ASIGNACION",
+            proyecto_id,
+            f"Asignación manual ULTRA de {len(ids)} personas"
+        )
+
+        st.success("Asignación manual realizada")
+        st.rerun()
