@@ -154,6 +154,87 @@ def obtener_personal_disponible(inicio, fin):
     conn.close()
     return filas
 
+# ==============================
+# PLACEHOLDERS PARA DASHBOARD
+# ==============================
+
+def obtener_asignaciones():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT 
+            a.id,
+            pr.nombre AS proyecto,
+            pe.nombre AS personal,
+            a.inicio,
+            a.fin,
+            a.activa
+        FROM asignaciones a
+        JOIN proyectos pr ON pr.id = a.proyecto_id
+        JOIN personal pe ON pe.id = a.personal_id
+        WHERE pr.eliminado = FALSE
+    """, conn)
+    conn.close()
+    return df
+
+
+def proyectos_activos():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT *
+        FROM proyectos
+        WHERE eliminado = FALSE
+          AND estado = 'Activo'
+    """, conn)
+    conn.close()
+    return df
+
+
+def personal_ocupado():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT DISTINCT pe.nombre
+        FROM asignaciones a
+        JOIN personal pe ON pe.id = a.personal_id
+        JOIN proyectos pr ON pr.id = a.proyecto_id
+        WHERE a.activa = TRUE
+          AND pr.eliminado = FALSE
+    """, conn)
+    conn.close()
+    return df
+
+
+def kpi_resumen():
+    activos, cerrados = kpi_proyectos()
+    total, libres, ocupados = kpi_personal()
+    asignaciones = kpi_asignaciones()
+
+    return {
+        "proyectos_activos": activos,
+        "proyectos_cerrados": cerrados,
+        "personal_total": total,
+        "personal_libre": libres,
+        "personal_ocupado": ocupados,
+        "asignaciones": asignaciones
+    }
+
+
+def resumen_persona(nombre_persona):
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT 
+            pr.nombre AS proyecto,
+            a.inicio,
+            a.fin
+        FROM asignaciones a
+        JOIN personal pe ON pe.id = a.personal_id
+        JOIN proyectos pr ON pr.id = a.proyecto_id
+        WHERE pe.nombre = %s
+          AND a.activa = TRUE
+          AND pr.eliminado = FALSE
+        ORDER BY a.inicio
+    """, conn, params=(nombre_persona,))
+    conn.close()
+    return df
 
 
 # ==============================
