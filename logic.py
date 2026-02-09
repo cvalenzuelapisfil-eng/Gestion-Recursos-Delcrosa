@@ -13,6 +13,30 @@ MINUTOS_BLOQUEO = 10
 
 
 # =====================================================
+# VALIDACIÓN DE SOLAPAMIENTO
+# =====================================================
+
+def hay_solapamiento(personal_id, inicio, fin):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM asignaciones a
+        JOIN proyectos p ON p.id = a.proyecto_id
+        WHERE a.personal_id = %s
+          AND a.activa = TRUE
+          AND p.eliminado = FALSE
+          AND a.inicio <= %s
+          AND a.fin >= %s
+    """, (personal_id, fin, inicio))
+
+    existe = cur.fetchone()[0] > 0
+    cerrar(conn, cur)
+    return existe
+
+
+# =====================================================
 # UTILIDADES
 # =====================================================
 
