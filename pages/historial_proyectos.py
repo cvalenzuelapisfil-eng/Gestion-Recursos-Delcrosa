@@ -5,23 +5,24 @@ from datetime import date, timedelta
 from database import get_connection
 from logic import tiene_permiso
 
-# --- PROTEGER LOGIN ---
-if "usuario_id" not in st.session_state:
+# =====================================================
+# 🔐 PROTEGER LOGIN
+# =====================================================
+if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.warning("Debes iniciar sesión")
     st.switch_page("app.py")
     st.stop()
 
 # =====================================================
-# 🔐 SEGURIDAD
+# 🔐 VALIDAR SESIÓN
 # =====================================================
-if "user_id" not in st.session_state or "rol" not in st.session_state:
+if "usuario" not in st.session_state or not st.session_state.usuario:
     st.error("Sesión inválida")
     st.stop()
 
 if not tiene_permiso(st.session_state.rol, "ver_auditoria"):
     st.error("⛔ No tienes permisos para ver el historial")
     st.stop()
-
 
 # =====================================================
 # CONFIG

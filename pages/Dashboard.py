@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import date, timedelta
 
 from logic import (
+    asegurar_sesion,
     tiene_permiso,
     obtener_personal_dashboard,
     proyectos_gantt_por_persona,
@@ -16,27 +17,28 @@ from logic import (
     calendario_recursos
 )
 
-st.set_page_config(page_title="Dashboard", layout="wide")
+# =====================================================
+# 🔐 SESIÓN GLOBAL
+# =====================================================
+asegurar_sesion()
 
-# --- PROTEGER LOGIN ---
-if "usuario_id" not in st.session_state:
-    st.warning("Debes iniciar sesión")
+if not st.session_state.autenticado:
     st.switch_page("app.py")
     st.stop()
 
 # =====================================================
-# 🔐 PROTECCIÓN
+# CONFIG
 # =====================================================
-if "usuario" not in st.session_state or not st.session_state.usuario:
-    st.error("Sesión no válida")
-    st.stop()
+st.set_page_config(page_title="Dashboard", layout="wide")
 
+# =====================================================
+# 🔐 PERMISOS
+# =====================================================
 if not tiene_permiso(st.session_state.rol, "ver_dashboard"):
     st.error("⛔ No tienes permiso")
     st.stop()
 
 st.title("📊 Dashboard de Gestión")
-
 
 # =====================================================
 # FILTRO POR PERSONA
@@ -60,10 +62,9 @@ if persona_sel != "Todos":
 if persona_nombre:
     if st.button(f"📅 Ver calendario de {persona_nombre}"):
         st.session_state["filtro_persona"] = persona_nombre
-        st.switch_page("calendario.py")
+        st.switch_page("pages/calendario_recursos.py")
 
 st.divider()
-
 
 # =====================================================
 # KPIs
@@ -84,7 +85,6 @@ col5.metric("Proyectos confirmados", confirmados)
 
 st.divider()
 
-
 # =====================================================
 # ALERTAS
 # =====================================================
@@ -100,9 +100,8 @@ else:
 
 st.divider()
 
-
 # =====================================================
-# HEATMAP SEMANAL
+# HEATMAP
 # =====================================================
 st.subheader("🔥 Heatmap semanal de carga")
 
@@ -153,9 +152,8 @@ else:
 
 st.divider()
 
-
 # =====================================================
-# GANTT DE PROYECTOS
+# GANTT
 # =====================================================
 st.subheader("📅 Gantt de Proyectos")
 
@@ -165,7 +163,6 @@ if df_gantt.empty:
     st.info("No hay proyectos para el filtro seleccionado")
 else:
 
-    # Normalizar nombres (tu logic usa minúsculas)
     df_gantt = df_gantt.rename(columns={
         "nombre": "Proyecto",
         "inicio": "Inicio",

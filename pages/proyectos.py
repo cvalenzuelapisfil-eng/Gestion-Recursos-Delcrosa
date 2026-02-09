@@ -9,9 +9,10 @@ from logic import (
     tiene_permiso
 )
 
-
-# --- PROTEGER LOGIN ---
-if "usuario_id" not in st.session_state:
+# =====================================================
+# 🔐 PROTEGER LOGIN
+# =====================================================
+if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
     st.warning("Debes iniciar sesión")
     st.switch_page("app.py")
     st.stop()
@@ -20,6 +21,8 @@ if "usuario_id" not in st.session_state:
 # CONFIG
 # =====================================================
 st.set_page_config(page_title="Proyectos", layout="wide")
+
+# Validar sesión global
 asegurar_sesion()
 
 # =====================================================
@@ -42,14 +45,16 @@ with st.expander("➕ Crear nuevo proyecto"):
         fin = st.date_input("Fecha fin")
         confirmado = st.checkbox("Proyecto confirmado")
 
-        guardar = st.form_submit_button("Guardar proyecto")
+        guardar_nuevo = st.form_submit_button("Guardar proyecto")
 
-        if guardar:
-            if not nombre:
+        if guardar_nuevo:
+            if not nombre.strip():
                 st.error("El nombre es obligatorio")
+            elif inicio > fin:
+                st.error("La fecha inicio no puede ser mayor que la fecha fin")
             else:
                 crear_proyecto(
-                    nombre,
+                    nombre.strip(),
                     inicio,
                     fin,
                     confirmado,
@@ -103,16 +108,24 @@ with st.form("form_modificar"):
         eliminar = st.form_submit_button("🗑️ Eliminar proyecto")
 
 # =====================================================
-# GUARDAR
+# GUARDAR CAMBIOS
 # =====================================================
 if guardar:
     if not tiene_permiso(st.session_state.rol, "editar_proyecto"):
         st.error("⛔ No tienes permiso para editar")
         st.stop()
 
+    if not nuevo_nombre.strip():
+        st.error("El nombre no puede estar vacío")
+        st.stop()
+
+    if nuevo_inicio > nuevo_fin:
+        st.error("La fecha inicio no puede ser mayor que la fecha fin")
+        st.stop()
+
     modificar_proyecto(
         pid,
-        nuevo_nombre,
+        nuevo_nombre.strip(),
         nuevo_inicio,
         nuevo_fin,
         nuevo_confirmado,

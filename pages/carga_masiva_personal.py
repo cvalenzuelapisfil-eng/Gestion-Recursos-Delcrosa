@@ -4,17 +4,18 @@ import io
 from database import get_connection
 from logic import tiene_permiso, registrar_auditoria, asegurar_sesion
 
-# --- PROTEGER LOGIN ---
-if "usuario_id" not in st.session_state:
-    st.warning("Debes iniciar sesión")
+# =====================================================
+# 🔐 SESIÓN GLOBAL
+# =====================================================
+asegurar_sesion()
+
+if not st.session_state.autenticado:
     st.switch_page("app.py")
     st.stop()
 
 # =====================================================
-# 🔐 SEGURIDAD GLOBAL
+# 🔐 PERMISOS
 # =====================================================
-asegurar_sesion()
-
 if not tiene_permiso(st.session_state.rol, "editar_personal"):
     st.error("⛔ No tienes permisos para carga masiva")
     st.stop()
@@ -25,14 +26,12 @@ if not tiene_permiso(st.session_state.rol, "editar_personal"):
 st.set_page_config(page_title="Carga Masiva de Personal", layout="wide")
 st.title("📥📤 Carga Masiva de Personal (Excel)")
 
-conn = get_connection()
-c = conn.cursor()
-
 # =====================================================
 # 📤 EXPORTAR PERSONAL ACTUAL
 # =====================================================
 st.subheader("📤 Exportar personal actual")
 
+conn = get_connection()
 df_personal = pd.read_sql("""
     SELECT nombre, cargo, area
     FROM personal
@@ -63,7 +62,13 @@ st.subheader("📥 Importar / Actualizar desde Excel")
 archivo = st.file_uploader("Selecciona archivo Excel", type=["xlsx"])
 
 if archivo:
+    conn = None
+    c = None
+
     try:
+        conn = get_connection()
+        c = conn.cursor()
+
         df = pd.read_excel(archivo)
 
         # Validar columnas
@@ -72,9 +77,7 @@ if archivo:
             st.error("El Excel debe tener columnas: nombre, cargo, area")
             st.stop()
 
-        # =====================================================
-        # LIMPIEZA DE DATOS
-        # =====================================================
+        # Limpieza
         df["nombre"] = df["nombre"].astype(str).str.strip()
         df["cargo"] = df["cargo"].astype(str).str.strip()
         df["area"] = df["area"].astype(str).str.strip()
@@ -84,7 +87,6 @@ if archivo:
 
         insertar = []
         actualizar = []
-        omitir = []
 
         for _, fila in df.iterrows():
             nombre = fila["nombre"]
@@ -99,18 +101,14 @@ if archivo:
             else:
                 insertar.append((nombre, cargo, area))
 
-        # =====================================================
-        # INSERTAR NUEVOS
-        # =====================================================
+        # INSERTAR
         if insertar:
             c.executemany("""
                 INSERT INTO personal (nombre, cargo, area)
                 VALUES (%s, %s, %s)
             """, insertar)
 
-        # =====================================================
-        # ACTUALIZAR EXISTENTES
-        # =====================================================
+        # ACTUALIZAR
         if actualizar:
             c.executemany("""
                 UPDATE personal
@@ -120,15 +118,12 @@ if archivo:
 
         conn.commit()
 
-        # =====================================================
-        # RESULTADO
-        # =====================================================
         st.success(f"""
-        ✔️ Carga completada
+✔️ Carga completada
 
-        • Insertados: {len(insertar)}  
-        • Actualizados: {len(actualizar)}
-        """)
+• Insertados: {len(insertar)}  
+• Actualizados: {len(actualizar)}
+""")
 
         registrar_auditoria(
             st.session_state.user_id,
@@ -142,5 +137,7 @@ if archivo:
         st.error(f"❌ Error en carga masiva: {e}")
 
     finally:
-        c.close()
-        conn.close()
+        if c:
+            c.close()
+        if conn:
+            conn.close()

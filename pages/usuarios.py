@@ -10,9 +10,12 @@ from logic import (
     registrar_auditoria
 )
 
-# --- PROTEGER LOGIN ---
-if "usuario_id" not in st.session_state:
-    st.warning("Debes iniciar sesión")
+# =====================================================
+# 🔐 SESIÓN GLOBAL
+# =====================================================
+asegurar_sesion()
+
+if not st.session_state.autenticado:
     st.switch_page("app.py")
     st.stop()
 
@@ -22,10 +25,8 @@ if "usuario_id" not in st.session_state:
 st.set_page_config(page_title="Usuarios", layout="wide")
 
 # =====================================================
-# 🔐 SEGURIDAD GLOBAL
+# 🔐 PERMISOS
 # =====================================================
-asegurar_sesion()
-
 if not tiene_permiso(st.session_state.rol, "gestionar_usuarios"):
     st.error("⛔ No tienes permiso para acceder aquí")
     st.stop()
@@ -33,7 +34,7 @@ if not tiene_permiso(st.session_state.rol, "gestionar_usuarios"):
 st.title("👥 Gestión de Usuarios")
 
 # =====================================================
-# CREAR USUARIO
+# ➕ CREAR USUARIO
 # =====================================================
 st.subheader("➕ Crear Usuario")
 
@@ -61,7 +62,7 @@ if st.button("Crear usuario"):
             crear_usuario(nuevo_usuario, nueva_password, nuevo_rol)
 
             registrar_auditoria(
-                st.session_state.usuario_id,
+                st.session_state.user_id,
                 "CREAR",
                 "USUARIO",
                 None,
@@ -74,7 +75,7 @@ if st.button("Crear usuario"):
 st.divider()
 
 # =====================================================
-# LISTA DE USUARIOS
+# 📋 LISTA DE USUARIOS
 # =====================================================
 st.subheader("📋 Usuarios del sistema")
 
@@ -87,24 +88,19 @@ if df.empty:
 for _, row in df.iterrows():
 
     uid = int(row["id"])
-    es_yo = uid == st.session_state.usuario_id
+    es_yo = uid == st.session_state.user_id
 
     col1, col2, col3, col4 = st.columns([3, 3, 3, 3])
 
-    # -----------------------
-    # USUARIO
-    # -----------------------
+    # ---------------- USER
     with col1:
         label = f"**{row['usuario']}**"
         if es_yo:
             label += " (Tú)"
         st.write(label)
 
-    # -----------------------
-    # CAMBIAR ROL
-    # -----------------------
+    # ---------------- CAMBIAR ROL
     with col2:
-
         rol_sel = st.selectbox(
             "Rol",
             ["usuario", "gestor", "admin"],
@@ -120,7 +116,7 @@ for _, row in df.iterrows():
                 cambiar_rol(uid, rol_sel)
 
                 registrar_auditoria(
-                    st.session_state.usuario_id,
+                    st.session_state.user_id,
                     "EDITAR",
                     "USUARIO",
                     uid,
@@ -130,11 +126,8 @@ for _, row in df.iterrows():
                 st.success("Rol actualizado")
                 st.rerun()
 
-    # -----------------------
-    # ACTIVAR / DESACTIVAR
-    # -----------------------
+    # ---------------- ACTIVO
     with col3:
-
         activo = st.toggle(
             "Activo",
             value=bool(row["activo"]),
@@ -149,7 +142,7 @@ for _, row in df.iterrows():
                 cambiar_estado(uid, activo)
 
                 registrar_auditoria(
-                    st.session_state.usuario_id,
+                    st.session_state.user_id,
                     "EDITAR",
                     "USUARIO",
                     uid,
@@ -159,11 +152,8 @@ for _, row in df.iterrows():
                 st.success("Estado actualizado")
                 st.rerun()
 
-    # -----------------------
-    # RESET PASSWORD
-    # -----------------------
+    # ---------------- RESET PASSWORD
     with col4:
-
         nueva_pass = st.text_input(
             "Nueva contraseña",
             type="password",
@@ -178,7 +168,7 @@ for _, row in df.iterrows():
                 cambiar_password(uid, nueva_pass)
 
                 registrar_auditoria(
-                    st.session_state.usuario_id,
+                    st.session_state.user_id,
                     "EDITAR",
                     "USUARIO",
                     uid,

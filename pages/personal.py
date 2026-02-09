@@ -1,32 +1,35 @@
 import streamlit as st
 import pandas as pd
 from database import get_connection
-from logic import tiene_permiso, registrar_auditoria
+from logic import (
+    asegurar_sesion,
+    tiene_permiso,
+    registrar_auditoria
+)
 
-# --- PROTEGER LOGIN ---
-if "usuario_id" not in st.session_state:
-    st.warning("Debes iniciar sesión")
+# =====================================================
+# 🔐 SESIÓN GLOBAL
+# =====================================================
+asegurar_sesion()
+
+if not st.session_state.autenticado:
     st.switch_page("app.py")
     st.stop()
 
-# -----------------------------------------------------
-# 🔐 SEGURIDAD
-# -----------------------------------------------------
-if "usuario" not in st.session_state or not st.session_state.usuario:
-    st.error("Sesión no válida")
-    st.stop()
-
-if not tiene_permiso(st.session_state.rol, "editar_personal"):
-    st.error("⛔ No tienes permisos para modificar personal")
-    st.stop()
-
-# -----------------------------------------------------
+# =====================================================
 # CONFIG
-# -----------------------------------------------------
+# =====================================================
 st.set_page_config(
     page_title="Estado y Gestión del Personal",
     layout="wide"
 )
+
+# =====================================================
+# 🔐 PERMISOS
+# =====================================================
+if not tiene_permiso(st.session_state.rol, "editar_personal"):
+    st.error("⛔ No tienes permisos para modificar personal")
+    st.stop()
 
 st.title("🧑‍💼 Estado y Gestión del Personal")
 
@@ -110,9 +113,7 @@ if not df.empty:
             cargo = cargo.strip()
             area = area.strip()
 
-            # -------------------------------------------------
             # VALIDACIONES
-            # -------------------------------------------------
             if not nombre or not cargo or not area:
                 st.error("Todos los campos son obligatorios")
                 st.stop()
@@ -125,9 +126,7 @@ if not df.empty:
                 st.info("No se detectaron cambios")
                 st.stop()
 
-            # -------------------------------------------------
             # UPDATE
-            # -------------------------------------------------
             c = conn.cursor()
             c.execute("""
                 UPDATE personal
@@ -136,11 +135,9 @@ if not df.empty:
             """, (nombre, cargo, area, persona_id))
             conn.commit()
 
-            # -------------------------------------------------
-            # 📝 AUDITORÍA
-            # -------------------------------------------------
+            # AUDITORÍA
             registrar_auditoria(
-                st.session_state.user_id,
+                st.session_state.usuario_id,
                 "EDITAR",
                 "PERSONAL",
                 persona_id,
@@ -153,7 +150,7 @@ if not df.empty:
 conn.close()
 
 # =====================================================
-# NOTA INFORMATIVA
+# NOTA
 # =====================================================
 st.caption(
     "🔎 **Estado del personal:** "

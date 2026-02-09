@@ -12,6 +12,22 @@ MAX_INTENTOS = 5
 MINUTOS_BLOQUEO = 10
 
 # =====================================================
+# ASEGURAR SESSION STATE (GLOBAL)
+# =====================================================
+def asegurar_sesion():
+    if "autenticado" not in st.session_state:
+        st.session_state.autenticado = False
+
+    if "usuario" not in st.session_state:
+        st.session_state.usuario = None
+
+    if "rol" not in st.session_state:
+        st.session_state.rol = "publico"
+
+    if "user_id" not in st.session_state:
+        st.session_state.user_id = None
+
+# =====================================================
 # DISPONIBILIDAD Y VALIDACIONES
 # =====================================================
 
