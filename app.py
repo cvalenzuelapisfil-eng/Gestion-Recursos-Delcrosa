@@ -91,7 +91,7 @@ if rol in ["admin", "gestor"]:
     st.sidebar.page_link("pages/asignaciones.py", label="Asignaciones")
 
 # Calendario (todos)
-st.sidebar.page_link("calendario.py", label="Calendario")
+st.sidebar.page_link("pages/calendario.py", label="Calendario")
 
 # Usuarios (solo admin)
 if rol == "admin":
