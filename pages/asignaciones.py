@@ -3,7 +3,7 @@ from logic import (
     asegurar_sesion,
     tiene_permiso,
     obtener_proyectos,
-    obtener_personal,
+    obtener_personal_disponible,
     asignar_personal,
     hay_solapamiento,
     sugerir_personal,
@@ -56,13 +56,8 @@ st.info(f"📅 {inicio} → {fin}")
 # =====================================================
 st.subheader("🤖 Motor Inteligente")
 
-personal = obtener_personal()
-
-# Filtrar solo libres
-personal_libre = personal[
-    ~personal["id"].apply(lambda pid: hay_solapamiento(pid, inicio, fin))
-]
-
+# SOLO PERSONAL DISPONIBLE (filtrado desde la BD → modo ERP real)
+personal_libre = obtener_personal_disponible(inicio, fin)
 if personal_libre.empty:
     st.warning("No hay personal libre en ese rango")
     st.stop()
