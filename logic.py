@@ -187,6 +187,176 @@ def obtener_proyectos():
     """, conn)
     cerrar(conn)
     return df.values.tolist()
+# =====================================================
+# PERSONAL PARA DASHBOARD
+# =====================================================
+
+def obtener_personal_dashboard():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, nombre
+        FROM personal
+        ORDER BY nombre
+    """, conn)
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# ASIGNACIONES
+# =====================================================
+
+def asignar_personal(proyecto_id, personal_ids, inicio, fin, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    for pid in personal_ids:
+        cur.execute("""
+            INSERT INTO asignaciones (personal_id, proyecto_id, inicio, fin, activa)
+            VALUES (%s, %s, %s, %s, TRUE)
+        """, (pid, proyecto_id, inicio, fin))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        registrar_auditoria(usuario, "ASIGNAR", "ASIGNACION", proyecto_id, f"{len(personal_ids)} personas asignadas")
+
+
+# =====================================================
+# SUGERENCIA AUTOMÁTICA
+# =====================================================
+
+def sugerir_personal(inicio, fin, limite=5):
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT 
+            p.id,
+            p.nombre,
+            COUNT(a.id) AS carga
+        FROM personal p
+        LEFT JOIN asignaciones a 
+            ON a.personal_id = p.id
+           AND a.activa = TRUE
+           AND a.inicio <= %s
+           AND a.fin >= %s
+        GROUP BY p.id, p.nombre
+        ORDER BY carga ASC, p.nombre
+        LIMIT %s
+    """, conn, params=(fin, inicio, limite))
+
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# CALENDARIO RECURSOS
+# =====================================================
+
+def calendario_recursos(inicio, fin):
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT 
+            pe.nombre AS "Personal",
+            pr.nombre AS "Proyecto",
+            a.inicio AS "Inicio",
+            a.fin AS "Fin"
+        FROM asignaciones a
+        JOIN personal pe ON pe.id = a.personal_id
+        JOIN proyectos pr ON pr.id = a.proyecto_id
+        WHERE a.activa = TRUE
+          AND pr.eliminado = FALSE
+          AND a.inicio <= %s
+          AND a.fin >= %s
+        ORDER BY pe.nombre, a.inicio
+    """, conn, params=(fin, inicio))
+
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# KPIs
+# =====================================================
+
+def kpi_proyectos():
+    conn = get_connection()
+    df = pd.read_sql("SELECT estado FROM proyectos WHERE eliminado = FALSE", conn)
+    cerrar(conn)
+
+    activos = len(df[df["estado"] == "Activo"])
+    cerrados = len(df[df["estado"] != "Activo"])
+    return activos, cerrados
+
+
+def kpi_personal():
+    conn = get_connection()
+
+    total = pd.read_sql("SELECT COUNT(*) AS t FROM personal", conn)["t"][0]
+
+    ocupados = pd.read_sql("""
+        SELECT COUNT(DISTINCT a.personal_id) AS o
+        FROM asignaciones a
+        JOIN proyectos p ON p.id = a.proyecto_id
+        WHERE a.activa = TRUE
+          AND p.eliminado = FALSE
+    """, conn)["o"][0]
+
+    cerrar(conn)
+    return total, total - ocupados, ocupados
+
+
+def kpi_asignaciones():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT COUNT(*) AS total
+        FROM asignaciones a
+        JOIN proyectos p ON p.id = a.proyecto_id
+        WHERE a.activa = TRUE
+          AND p.eliminado = FALSE
+    """, conn)
+    cerrar(conn)
+    return int(df.iloc[0]["total"])
+
+
+def kpi_solapamientos():
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT COUNT(*) AS total
+        FROM asignaciones a1
+        JOIN asignaciones a2
+          ON a1.personal_id = a2.personal_id
+         AND a1.id <> a2.id
+         AND a1.inicio <= a2.fin
+         AND a1.fin >= a2.inicio
+        WHERE a1.activa = TRUE
+          AND a2.activa = TRUE
+    """, conn)
+
+    cerrar(conn)
+    return int(df.iloc[0]["total"])
+
+
+def kpi_proyectos_confirmados():
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT confirmado, COUNT(*) AS total
+        FROM proyectos
+        WHERE eliminado = FALSE
+        GROUP BY confirmado
+    """, conn)
+
+    cerrar(conn)
+
+    confirmados = int(df[df["confirmado"] == True]["total"].sum())
+    no_confirmados = int(df[df["confirmado"] == False]["total"].sum())
+
+    return confirmados, no_confirmados
+
 
 # =====================================================
 # PERSONAL
