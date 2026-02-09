@@ -11,6 +11,142 @@ from database import get_connection
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
+# =====================================================
+# DASHBOARD — FUNCIONES FALTANTES
+# =====================================================
+
+def obtener_personal_dashboard():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, nombre
+        FROM personal
+        ORDER BY nombre
+    """, conn)
+    conn.close()
+    return df
+
+
+def proyectos_gantt_por_persona(personal_id=None):
+    conn = get_connection()
+
+    query = """
+        SELECT 
+            pr.nombre,
+            pr.inicio,
+            pr.fin,
+            CASE 
+                WHEN pr.confirmado THEN 'Confirmado'
+                ELSE 'No confirmado'
+            END AS "Confirmacion"
+        FROM proyectos pr
+        LEFT JOIN asignaciones a ON a.proyecto_id = pr.id
+        WHERE pr.eliminado = FALSE
+    """
+
+    params = []
+
+    if personal_id:
+        query += " AND a.personal_id = %s"
+        params.append(personal_id)
+
+    query += " ORDER BY pr.inicio"
+
+    df = pd.read_sql(query, conn, params=params)
+    conn.close()
+    return df
+
+
+def obtener_alertas_por_persona(personal_id=None):
+    conn = get_connection()
+    c = conn.cursor()
+
+    query = """
+        SELECT pe.nombre, pr.nombre, a.inicio, a.fin
+        FROM asignaciones a
+        JOIN personal pe ON pe.id = a.personal_id
+        JOIN proyectos pr ON pr.id = a.proyecto_id
+        WHERE a.activa = TRUE
+          AND pr.eliminado = FALSE
+    """
+
+    params = []
+
+    if personal_id:
+        query += " AND pe.id = %s"
+        params.append(personal_id)
+
+    c.execute(query, params)
+    filas = c.fetchall()
+    conn.close()
+
+    alertas = []
+
+    for nombre, proyecto, inicio, fin in filas:
+        if hay_solapamiento_por_rango(nombre, inicio, fin):
+            alertas.append(
+                f"{nombre} tiene sobreasignación en proyecto {proyecto}"
+            )
+
+    return alertas
+
+
+def hay_solapamiento_por_rango(nombre_persona, inicio, fin):
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("""
+        SELECT COUNT(*)
+        FROM asignaciones a
+        JOIN personal p ON p.id = a.personal_id
+        WHERE p.nombre = %s
+          AND a.activa = TRUE
+          AND a.inicio <= %s
+          AND a.fin >= %s
+    """, (nombre_persona, fin, inicio))
+
+    count = c.fetchone()[0]
+    conn.close()
+
+    return count > 1
+
+
+def kpi_solapamientos():
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT personal_id, inicio, fin
+        FROM asignaciones
+        WHERE activa = TRUE
+    """, conn)
+
+    conn.close()
+
+    solapamientos = 0
+
+    for i, r1 in df.iterrows():
+        for j, r2 in df.iterrows():
+            if i != j and r1["personal_id"] == r2["personal_id"]:
+                if r1["inicio"] <= r2["fin"] and r1["fin"] >= r2["inicio"]:
+                    solapamientos += 1
+
+    return solapamientos // 2
+
+
+def kpi_proyectos_confirmados():
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT confirmado
+        FROM proyectos
+        WHERE eliminado = FALSE
+    """, conn)
+
+    conn.close()
+
+    confirmados = len(df[df["confirmado"] == True])
+    no_confirmados = len(df[df["confirmado"] == False])
+
+    return confirmados, no_confirmados
 
 # ==============================
 # LOGIN
