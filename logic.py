@@ -10,6 +10,60 @@ from database import get_connection
 
 MAX_INTENTOS = 5
 MINUTOS_BLOQUEO = 10
+# =====================================================
+# CRUD PROYECTOS (AÑADIDO)
+# =====================================================
+
+def crear_proyecto(nombre, inicio, fin, confirmado, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO proyectos (nombre, inicio, fin, confirmado, estado, eliminado)
+        VALUES (%s, %s, %s, %s, 'Activo', FALSE)
+        RETURNING id
+    """, (nombre, inicio, fin, confirmado))
+
+    proyecto_id = cur.fetchone()[0]
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        registrar_auditoria(usuario, "CREAR", "PROYECTO", proyecto_id, nombre)
+
+
+def modificar_proyecto(pid, nombre, inicio, fin, confirmado, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE proyectos
+        SET nombre=%s, inicio=%s, fin=%s, confirmado=%s
+        WHERE id=%s
+    """, (nombre, inicio, fin, confirmado, pid))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        registrar_auditoria(usuario, "EDITAR", "PROYECTO", pid, nombre)
+
+
+def eliminar_proyecto(pid, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE proyectos
+        SET eliminado = TRUE
+        WHERE id=%s
+    """, (pid,))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        registrar_auditoria(usuario, "ELIMINAR", "PROYECTO", pid, "")
 
 # =====================================================
 # ALERTAS POR PERSONA (AÑADIDO)
