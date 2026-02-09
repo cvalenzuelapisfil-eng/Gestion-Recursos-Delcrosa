@@ -206,14 +206,6 @@ def kpi_personal():
     conn.close()
     return total, total - ocupados, ocupados
 
-def calendario_recursos():
-    """
-    Función placeholder para evitar error de import.
-    Luego puedes reemplazarla con tu lógica real.
-    """
-    return []
-
-
 def kpi_asignaciones():
     conn = get_connection()
     df = pd.read_sql("""
