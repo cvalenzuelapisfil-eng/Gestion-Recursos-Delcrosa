@@ -49,7 +49,7 @@ def hash_password(password: str) -> str:
 # ROLES Y PERMISOS
 # =====================================================
 
-   PERMISOS = {
+PERMISOS = {
     "admin": {
         "ver_dashboard",
         "gestionar_usuarios",
