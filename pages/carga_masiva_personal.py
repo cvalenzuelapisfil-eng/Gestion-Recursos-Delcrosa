@@ -4,6 +4,12 @@ import io
 from database import get_connection
 from logic import tiene_permiso, registrar_auditoria, asegurar_sesion
 
+# --- PROTEGER LOGIN ---
+if "usuario_id" not in st.session_state:
+    st.warning("Debes iniciar sesión")
+    st.switch_page("app.py")
+    st.stop()
+
 # =====================================================
 # 🔐 SEGURIDAD GLOBAL
 # =====================================================

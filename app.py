@@ -12,9 +12,11 @@ st.set_page_config(
 # SESSION STATE
 # =====================================================
 if "usuario" not in st.session_state:
-    st.session_state.usuario = None
-    st.session_state.rol = None
-    st.session_state.user_id = None
+   st.session_state.usuario = user["usuario"]
+st.session_state.rol = user["rol"]
+st.session_state.usuario_id = user["id"]
+st.session_state.logueado = True
+
 
 
 # =====================================================

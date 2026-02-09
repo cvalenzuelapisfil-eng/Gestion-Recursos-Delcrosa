@@ -9,6 +9,13 @@ from logic import (
     tiene_permiso
 )
 
+
+# --- PROTEGER LOGIN ---
+if "usuario_id" not in st.session_state:
+    st.warning("Debes iniciar sesión")
+    st.switch_page("app.py")
+    st.stop()
+
 # =====================================================
 # CONFIG
 # =====================================================

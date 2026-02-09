@@ -18,6 +18,12 @@ from logic import (
 
 st.set_page_config(page_title="Dashboard", layout="wide")
 
+# --- PROTEGER LOGIN ---
+if "usuario_id" not in st.session_state:
+    st.warning("Debes iniciar sesión")
+    st.switch_page("app.py")
+    st.stop()
+
 # =====================================================
 # 🔐 PROTECCIÓN
 # =====================================================
