@@ -11,6 +11,36 @@ from database import get_connection
 MAX_INTENTOS = 5
 MINUTOS_BLOQUEO = 10
 
+# =====================================================
+# TOTALES DASHBOARD
+# =====================================================
+
+def total_proyectos():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM proyectos WHERE eliminado = FALSE")
+    total = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return total
+
+
+def total_personal():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM personal")
+    total = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return total
+
+
+def total_asignaciones_activas():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM asignaciones WHERE activa = TRUE")
+    total = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return total
+
 
 # =====================================================
 # VALIDACIÓN DE SOLAPAMIENTO
@@ -186,7 +216,8 @@ def obtener_proyectos():
         ORDER BY inicio DESC
     """, conn)
     cerrar(conn)
-    return df.values.tolist()
+    return df   # ← NO lista
+
 # =====================================================
 # PERSONAL PARA DASHBOARD
 # =====================================================
