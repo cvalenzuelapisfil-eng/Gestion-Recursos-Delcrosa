@@ -668,3 +668,24 @@ def calendario_recursos(inicio, fin):
     """, conn, params=(fin, inicio))
     cerrar(conn)
     return df
+# =====================================================
+# CARGA MASIVA
+# =====================================================
+
+def registrar_carga_masiva(usuario_id, entidad, insertados, actualizados, errores, simulacion, detalle=""):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO cargas_masivas
+        (usuario_id, entidad, registros_insertados, registros_actualizados, registros_error, modo_simulacion, detalle)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        RETURNING id
+    """, (usuario_id, entidad, insertados, actualizados, errores, simulacion, detalle))
+
+    carga_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return carga_id
+
