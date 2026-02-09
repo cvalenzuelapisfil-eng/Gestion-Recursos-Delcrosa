@@ -173,6 +173,20 @@ def validar_usuario(usuario, password):
 
     return (user_id, username, rol)
 
+# =====================================================
+# PROYECTOS
+# =====================================================
+
+def obtener_proyectos():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, nombre, codigo, estado, inicio, fin, confirmado
+        FROM proyectos
+        WHERE eliminado = FALSE
+        ORDER BY inicio DESC
+    """, conn)
+    cerrar(conn)
+    return df.values.tolist()
 
 # =====================================================
 # PERSONAL
