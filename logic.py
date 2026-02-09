@@ -49,7 +49,7 @@ def hash_password(password: str) -> str:
 # ROLES Y PERMISOS
 # =====================================================
 
-PERMISOS = {
+   PERMISOS = {
     "admin": {
         "ver_dashboard",
         "gestionar_usuarios",
@@ -57,19 +57,21 @@ PERMISOS = {
         "editar_proyecto",
         "eliminar_proyecto",
         "asignar_personal",
-        "ver_auditoria"
+        "editar_personal",        # 👈 AÑADIR
+        "ver_auditoria"           # 👈 AÑADIR
     },
     "gestor": {
         "ver_dashboard",
         "crear_proyecto",
         "editar_proyecto",
-        "asignar_personal"
+        "asignar_personal",
+        "editar_personal"         # 👈 OPCIONAL
     },
     "usuario": {
         "ver_dashboard"
-    },
-    "publico": set()
+    }
 }
+
 
 
 def tiene_permiso(rol, permiso):
