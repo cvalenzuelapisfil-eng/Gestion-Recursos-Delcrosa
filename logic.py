@@ -12,6 +12,81 @@ MAX_INTENTOS = 5
 MINUTOS_BLOQUEO = 10
 
 # =====================================================
+# ASIGNACIONES - GESTIÓN COMPLETA
+# =====================================================
+
+def obtener_asignaciones():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT 
+            a.id,
+            pe.nombre AS personal,
+            pr.nombre AS proyecto,
+            a.inicio,
+            a.fin,
+            a.activa
+        FROM asignaciones a
+        JOIN personal pe ON pe.id = a.personal_id
+        JOIN proyectos pr ON pr.id = a.proyecto_id
+        WHERE pr.eliminado = FALSE
+        ORDER BY a.inicio DESC
+    """, conn)
+    cerrar(conn)
+    return df
+
+
+def eliminar_asignacion(asignacion_id, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE asignaciones
+        SET activa = FALSE
+        WHERE id = %s
+    """, (asignacion_id,))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        registrar_auditoria(usuario, "ELIMINAR", "ASIGNACION", asignacion_id)
+
+
+def modificar_asignacion(asignacion_id, inicio, fin, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE asignaciones
+        SET inicio=%s, fin=%s
+        WHERE id=%s
+    """, (inicio, fin, asignacion_id))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        registrar_auditoria(usuario, "EDITAR", "ASIGNACION", asignacion_id)
+
+
+def detectar_solapamientos(personal_id, inicio, fin):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM asignaciones
+        WHERE personal_id = %s
+          AND activa = TRUE
+          AND (inicio, fin) OVERLAPS (%s, %s)
+    """, (personal_id, inicio, fin))
+
+    conflictos = cur.fetchone()[0]
+    cerrar(conn, cur)
+
+    return conflictos > 0
+
+# =====================================================
 # SESIÓN STREAMLIT (ESTABLE)
 # =====================================================
 
