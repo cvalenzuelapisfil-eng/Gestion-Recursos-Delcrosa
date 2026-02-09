@@ -12,6 +12,98 @@ MAX_INTENTOS = 5
 MINUTOS_BLOQUEO = 10
 
 # =====================================================
+# ALERTAS POR PERSONA (AÑADIDO)
+# =====================================================
+
+def obtener_alertas_por_persona(personal_id=None):
+    try:
+        conn = get_connection()
+
+        if personal_id:
+            df = pd.read_sql("""
+                SELECT pe.nombre, COUNT(*) AS total
+                FROM asignaciones a1
+                JOIN asignaciones a2
+                  ON a1.personal_id = a2.personal_id
+                 AND a1.id <> a2.id
+                 AND a1.inicio <= a2.fin
+                 AND a1.fin >= a2.inicio
+                JOIN personal pe ON pe.id = a1.personal_id
+                WHERE a1.activa = TRUE
+                  AND a2.activa = TRUE
+                  AND pe.id = %s
+                GROUP BY pe.nombre
+            """, conn, params=(personal_id,))
+        else:
+            df = pd.read_sql("""
+                SELECT pe.nombre, COUNT(*) AS total
+                FROM asignaciones a1
+                JOIN asignaciones a2
+                  ON a1.personal_id = a2.personal_id
+                 AND a1.id <> a2.id
+                 AND a1.inicio <= a2.fin
+                 AND a1.fin >= a2.inicio
+                JOIN personal pe ON pe.id = a1.personal_id
+                WHERE a1.activa = TRUE
+                  AND a2.activa = TRUE
+                GROUP BY pe.nombre
+            """, conn)
+
+        cerrar(conn)
+
+        alertas = []
+        for _, r in df.iterrows():
+            alertas.append(f"⚠️ {r['nombre']} tiene {int(r['total'])} solapamientos")
+
+        return alertas
+
+    except Exception:
+        return []
+
+
+# =====================================================
+# GANTT DE PROYECTOS POR PERSONA (AÑADIDO)
+# =====================================================
+
+def proyectos_gantt_por_persona(personal_id=None):
+    conn = get_connection()
+
+    if personal_id:
+        df = pd.read_sql("""
+            SELECT 
+                pr.nombre,
+                pr.inicio,
+                pr.fin,
+                CASE WHEN pr.confirmado = TRUE 
+                     THEN 'Confirmado'
+                     ELSE 'No confirmado'
+                END AS confirmacion
+            FROM asignaciones a
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.activa = TRUE
+              AND pr.eliminado = FALSE
+              AND a.personal_id = %s
+            ORDER BY pr.inicio
+        """, conn, params=(personal_id,))
+    else:
+        df = pd.read_sql("""
+            SELECT 
+                pr.nombre,
+                pr.inicio,
+                pr.fin,
+                CASE WHEN pr.confirmado = TRUE 
+                     THEN 'Confirmado'
+                     ELSE 'No confirmado'
+                END AS confirmacion
+            FROM proyectos pr
+            WHERE pr.eliminado = FALSE
+            ORDER BY pr.inicio
+        """, conn)
+
+    cerrar(conn)
+    return df
+
+# =====================================================
 # TOTALES DASHBOARD
 # =====================================================
 
