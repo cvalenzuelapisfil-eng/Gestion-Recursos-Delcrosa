@@ -19,6 +19,85 @@ if not tiene_permiso(st.session_state.rol, "crear_proyecto"):
 
 st.title("📁 Gestión de Proyectos")
 
+# =====================================================
+# PROYECTOS CRUD (AÑADIDO)
+# =====================================================
+
+def crear_proyecto(nombre, codigo, estado, inicio, fin, confirmado=False, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO proyectos (nombre, codigo, estado, inicio, fin, confirmado, eliminado)
+        VALUES (%s, %s, %s, %s, %s, %s, FALSE)
+        RETURNING id
+    """, (nombre, codigo, estado, inicio, fin, confirmado))
+
+    proyecto_id = cur.fetchone()[0]
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        registrar_auditoria(usuario, "CREAR", "PROYECTO", proyecto_id, nombre)
+
+    return proyecto_id
+
+
+def editar_proyecto(proyecto_id, nombre, codigo, estado, inicio, fin, confirmado, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE proyectos
+        SET nombre=%s,
+            codigo=%s,
+            estado=%s,
+            inicio=%s,
+            fin=%s,
+            confirmado=%s
+        WHERE id=%s
+    """, (nombre, codigo, estado, inicio, fin, confirmado, proyecto_id))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        registrar_auditoria(usuario, "EDITAR", "PROYECTO", proyecto_id, nombre)
+
+
+def eliminar_proyecto(proyecto_id, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE proyectos
+        SET eliminado = TRUE
+        WHERE id = %s
+    """, (proyecto_id,))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        registrar_auditoria(usuario, "ELIMINAR", "PROYECTO", proyecto_id)
+
+
+def cambiar_confirmacion_proyecto(proyecto_id, confirmado, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE proyectos
+        SET confirmado = %s
+        WHERE id = %s
+    """, (confirmado, proyecto_id))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    if usuario:
+        accion = "CONFIRMAR" if confirmado else "DESCONFIRMAR"
+        registrar_auditoria(usuario, accion, "PROYECTO", proyecto_id)
 
 # ===============================
 # FORMULARIO CREAR PROYECTO
