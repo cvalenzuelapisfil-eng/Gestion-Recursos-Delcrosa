@@ -12,6 +12,74 @@ MAX_INTENTOS = 5
 MINUTOS_BLOQUEO = 10
 
 # =====================================================
+# DISPONIBILIDAD Y VALIDACIONES
+# =====================================================
+
+def hay_solapamiento(personal_id, inicio, fin):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM asignaciones a
+        JOIN proyectos p ON p.id = a.proyecto_id
+        WHERE a.personal_id = %s
+          AND a.activa = TRUE
+          AND p.eliminado = FALSE
+          AND a.inicio <= %s
+          AND a.fin >= %s
+    """, (personal_id, fin, inicio))
+
+    count = cur.fetchone()[0]
+    cerrar(conn, cur)
+
+    return count > 0
+
+
+def obtener_personal_disponible(inicio, fin):
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT p.id, p.nombre
+        FROM personal p
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM asignaciones a
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.personal_id = p.id
+              AND a.activa = TRUE
+              AND pr.eliminado = FALSE
+              AND a.inicio <= %s
+              AND a.fin >= %s
+        )
+        ORDER BY p.nombre
+    """, conn, params=(fin, inicio))
+
+    cerrar(conn)
+    return df
+
+
+def sugerir_personal(inicio, fin):
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT p.id, p.nombre, COUNT(a.id) AS carga
+        FROM personal p
+        LEFT JOIN asignaciones a
+            ON a.personal_id = p.id
+           AND a.activa = TRUE
+           AND a.inicio <= %s
+           AND a.fin >= %s
+        GROUP BY p.id, p.nombre
+        ORDER BY carga ASC, p.nombre
+        LIMIT 5
+    """, conn, params=(fin, inicio))
+
+    cerrar(conn)
+    return df
+
+
+# =====================================================
 # ASIGNACIONES - GESTIÓN COMPLETA
 # =====================================================
 
