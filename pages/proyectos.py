@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 from logic import (
@@ -12,7 +13,7 @@ from logic import (
 # =====================================================
 # 🔐 PROTEGER LOGIN
 # =====================================================
-if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
+if "user_id" not in st.session_state or not st.session_state.user_id:
     st.warning("Debes iniciar sesión")
     st.switch_page("app.py")
     st.stop()
@@ -58,7 +59,7 @@ with st.expander("➕ Crear nuevo proyecto"):
                     inicio,
                     fin,
                     confirmado,
-                    st.session_state.usuario_id
+                    st.session_state.user_id
                 )
                 st.success("Proyecto creado correctamente")
                 st.rerun()
@@ -129,7 +130,7 @@ if guardar:
         nuevo_inicio,
         nuevo_fin,
         nuevo_confirmado,
-        st.session_state.usuario_id
+        st.session_state.user_id
     )
     st.success("Proyecto actualizado")
     st.rerun()
@@ -142,6 +143,7 @@ if eliminar:
         st.error("⛔ Solo administrador puede eliminar")
         st.stop()
 
-    eliminar_proyecto(pid, st.session_state.usuario_id)
+    eliminar_proyecto(pid, st.session_state.user_id)
     st.success("Proyecto eliminado")
     st.rerun()
+```

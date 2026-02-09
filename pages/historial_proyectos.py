@@ -1,25 +1,25 @@
+```python
 import streamlit as st
 import pandas as pd
 import io
 from datetime import date, timedelta
 from database import get_connection
-from logic import tiene_permiso
+from logic import tiene_permiso, asegurar_sesion
 
 # =====================================================
-# 🔐 PROTEGER LOGIN
+# 🔐 PROTEGER LOGIN (usar user_id correcto)
 # =====================================================
-if "usuario_id" not in st.session_state or not st.session_state.usuario_id:
+if "user_id" not in st.session_state or not st.session_state.user_id:
     st.warning("Debes iniciar sesión")
     st.switch_page("app.py")
     st.stop()
 
-# =====================================================
-# 🔐 VALIDAR SESIÓN
-# =====================================================
-if "usuario" not in st.session_state or not st.session_state.usuario:
-    st.error("Sesión inválida")
-    st.stop()
+# Validar sesión global
+asegurar_sesion()
 
+# =====================================================
+# 🔐 PERMISOS
+# =====================================================
 if not tiene_permiso(st.session_state.rol, "ver_auditoria"):
     st.error("⛔ No tienes permisos para ver el historial")
     st.stop()
@@ -94,7 +94,7 @@ if df.empty:
     st.stop()
 
 # =====================================================
-# KPIs DE ACTIVIDAD
+# KPIs
 # =====================================================
 st.subheader("📊 Actividad")
 
@@ -113,15 +113,7 @@ st.subheader("📋 Detalle")
 st.dataframe(
     df,
     use_container_width=True,
-    column_config={
-        "fecha": "Fecha",
-        "proyecto": "Proyecto",
-        "accion": "Acción",
-        "campo": "Campo",
-        "valor_anterior": "Antes",
-        "valor_nuevo": "Después",
-        "usuario": "Usuario"
-    }
+    hide_index=True
 )
 
 # =====================================================
@@ -140,3 +132,4 @@ st.download_button(
     file_name="historial_proyectos.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
+```
