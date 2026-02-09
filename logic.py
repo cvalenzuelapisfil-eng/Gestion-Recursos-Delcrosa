@@ -50,20 +50,21 @@ def calendario_recursos(fecha_inicio, fecha_fin):
         SELECT 
             pr.nombre AS "Proyecto",
             pe.nombre AS "Personal",
-            a.fecha_inicio AS "Inicio",
-            a.fecha_fin AS "Fin"
+            a.inicio AS "Inicio",
+            a.fin AS "Fin"
         FROM asignaciones a
         JOIN proyectos pr ON a.proyecto_id = pr.id
         JOIN personal pe ON a.personal_id = pe.id
-        WHERE a.fecha_fin >= %s
-          AND a.fecha_inicio <= %s
-        ORDER BY a.fecha_inicio
+        WHERE a.fin >= %s
+          AND a.inicio <= %s
+          AND a.activa = TRUE
+        ORDER BY a.inicio
     """
 
     df = pd.read_sql(query, conn, params=(fecha_inicio, fecha_fin))
     conn.close()
-
     return df
+
 
 
 # ==============================
