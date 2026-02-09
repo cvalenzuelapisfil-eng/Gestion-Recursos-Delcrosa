@@ -8,13 +8,14 @@ from logic import tiene_permiso
 # =====================================================
 # 🔐 SEGURIDAD
 # =====================================================
-if "usuario" not in st.session_state:
+if "user_id" not in st.session_state or "rol" not in st.session_state:
     st.error("Sesión inválida")
     st.stop()
 
 if not tiene_permiso(st.session_state.rol, "ver_auditoria"):
     st.error("⛔ No tienes permisos para ver el historial")
     st.stop()
+
 
 # =====================================================
 # CONFIG

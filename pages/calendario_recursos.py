@@ -1,13 +1,24 @@
 import streamlit as st
 import plotly.express as px
+import pandas as pd
 from datetime import date, timedelta
-from logic import calendario_recursos, tiene_permiso
 
+from logic import (
+    asegurar_sesion,
+    calendario_recursos,
+    tiene_permiso
+)
+
+# =====================================================
+# CONFIG
+# =====================================================
 st.set_page_config(page_title="Calendario de Recursos", layout="wide")
 
 # =====================================================
-# 🔐 PERMISO (todos los roles pueden ver dashboard)
+# 🔐 SEGURIDAD GLOBAL
 # =====================================================
+asegurar_sesion()
+
 if not tiene_permiso(st.session_state.rol, "ver_dashboard"):
     st.error("⛔ No tienes permiso para acceder")
     st.stop()
@@ -22,15 +33,16 @@ persona_filtro = st.session_state.get("filtro_persona")
 if persona_filtro:
     st.info(f"Mostrando calendario de: **{persona_filtro}**")
 
-
 # =====================================================
 # RANGO DE FECHAS
 # =====================================================
 hoy = date.today()
 
 col1, col2 = st.columns(2)
+
 with col1:
     inicio = st.date_input("Desde", hoy - timedelta(days=7))
+
 with col2:
     fin = st.date_input("Hasta", hoy + timedelta(days=30))
 
@@ -38,19 +50,29 @@ if inicio > fin:
     st.warning("La fecha inicio no puede ser mayor que la fecha fin")
     st.stop()
 
-
 # =====================================================
-# DATOS
+# CARGA DE DATOS
 # =====================================================
-df = calendario_recursos(inicio, fin)
-
-if persona_filtro:
-    df = df[df["Personal"] == persona_filtro]
+try:
+    df = calendario_recursos(inicio, fin)
+except Exception as e:
+    st.error(f"Error cargando calendario: {e}")
+    st.stop()
 
 if df.empty:
     st.info("No hay asignaciones en este rango")
     st.stop()
 
+# Filtro por persona
+if persona_filtro:
+    df = df[df["Personal"] == persona_filtro]
+    if df.empty:
+        st.info("No hay asignaciones para esta persona en el rango")
+        st.stop()
+
+# Normalizar fechas
+df["Inicio"] = pd.to_datetime(df["Inicio"])
+df["Fin"] = pd.to_datetime(df["Fin"])
 
 # =====================================================
 # DETECTAR SOLAPAMIENTOS (VISUAL)
@@ -68,9 +90,8 @@ for persona in df["Personal"].unique():
             df.loc[subset.index[i], "Conflicto"] = True
             df.loc[subset.index[i + 1], "Conflicto"] = True
 
-
 # =====================================================
-# CALENDARIO VISUAL
+# CALENDARIO VISUAL (GANTT)
 # =====================================================
 fig = px.timeline(
     df,
@@ -78,7 +99,12 @@ fig = px.timeline(
     x_end="Fin",
     y="Personal",
     color="Proyecto",
-    hover_data=["Proyecto", "Inicio", "Fin", "Conflicto"]
+    hover_data={
+        "Proyecto": True,
+        "Inicio": True,
+        "Fin": True,
+        "Conflicto": True
+    }
 )
 
 fig.update_yaxes(autorange="reversed")
@@ -86,13 +112,11 @@ fig.update_layout(height=600)
 
 st.plotly_chart(fig, use_container_width=True)
 
-
 # =====================================================
-# ALERTA SI HAY CONFLICTOS
+# ALERTA DE CONFLICTOS
 # =====================================================
 if df["Conflicto"].any():
     st.warning("⚠️ Existen solapamientos de asignaciones")
-
 
 # =====================================================
 # LIMPIAR FILTRO

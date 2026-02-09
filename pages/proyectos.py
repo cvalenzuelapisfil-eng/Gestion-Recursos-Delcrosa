@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from logic import (
+    asegurar_sesion,
     obtener_proyectos,
     crear_proyecto,
     modificar_proyecto,
@@ -8,7 +9,11 @@ from logic import (
     tiene_permiso
 )
 
+# =====================================================
+# CONFIG
+# =====================================================
 st.set_page_config(page_title="Proyectos", layout="wide")
+asegurar_sesion()
 
 # =====================================================
 # BLOQUEO POR PERMISOS
@@ -20,88 +25,8 @@ if not tiene_permiso(st.session_state.rol, "crear_proyecto"):
 st.title("📁 Gestión de Proyectos")
 
 # =====================================================
-# PROYECTOS CRUD (AÑADIDO)
+# CREAR PROYECTO
 # =====================================================
-
-def crear_proyecto(nombre, codigo, estado, inicio, fin, confirmado=False, usuario=None):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        INSERT INTO proyectos (nombre, codigo, estado, inicio, fin, confirmado, eliminado)
-        VALUES (%s, %s, %s, %s, %s, %s, FALSE)
-        RETURNING id
-    """, (nombre, codigo, estado, inicio, fin, confirmado))
-
-    proyecto_id = cur.fetchone()[0]
-    conn.commit()
-    cerrar(conn, cur)
-
-    if usuario:
-        registrar_auditoria(usuario, "CREAR", "PROYECTO", proyecto_id, nombre)
-
-    return proyecto_id
-
-
-def editar_proyecto(proyecto_id, nombre, codigo, estado, inicio, fin, confirmado, usuario=None):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        UPDATE proyectos
-        SET nombre=%s,
-            codigo=%s,
-            estado=%s,
-            inicio=%s,
-            fin=%s,
-            confirmado=%s
-        WHERE id=%s
-    """, (nombre, codigo, estado, inicio, fin, confirmado, proyecto_id))
-
-    conn.commit()
-    cerrar(conn, cur)
-
-    if usuario:
-        registrar_auditoria(usuario, "EDITAR", "PROYECTO", proyecto_id, nombre)
-
-
-def eliminar_proyecto(proyecto_id, usuario=None):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        UPDATE proyectos
-        SET eliminado = TRUE
-        WHERE id = %s
-    """, (proyecto_id,))
-
-    conn.commit()
-    cerrar(conn, cur)
-
-    if usuario:
-        registrar_auditoria(usuario, "ELIMINAR", "PROYECTO", proyecto_id)
-
-
-def cambiar_confirmacion_proyecto(proyecto_id, confirmado, usuario=None):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        UPDATE proyectos
-        SET confirmado = %s
-        WHERE id = %s
-    """, (confirmado, proyecto_id))
-
-    conn.commit()
-    cerrar(conn, cur)
-
-    if usuario:
-        accion = "CONFIRMAR" if confirmado else "DESCONFIRMAR"
-        registrar_auditoria(usuario, accion, "PROYECTO", proyecto_id)
-
-# ===============================
-# FORMULARIO CREAR PROYECTO
-# ===============================
 with st.expander("➕ Crear nuevo proyecto"):
 
     with st.form("form_crear_proyecto"):
@@ -120,55 +45,47 @@ with st.expander("➕ Crear nuevo proyecto"):
                     nombre,
                     inicio,
                     fin,
-                    int(confirmado),
-                    st.session_state["user_id"]   # 👈 usamos ID real
+                    confirmado,
+                    st.session_state.usuario_id
                 )
                 st.success("Proyecto creado correctamente")
                 st.rerun()
 
 st.divider()
 
-
-# ===============================
-# LISTADO DE PROYECTOS
-# ===============================
+# =====================================================
+# LISTADO
+# =====================================================
 st.subheader("📋 Proyectos registrados")
 
-proyectos = obtener_proyectos()
+df = obtener_proyectos()
 
-if not proyectos:
+if df.empty:
     st.info("No hay proyectos registrados")
     st.stop()
-
-df = pd.DataFrame(
-    proyectos,
-    columns=["id", "nombre", "codigo", "estado", "inicio", "fin", "confirmado"]
-)
 
 st.dataframe(df, use_container_width=True, hide_index=True)
 
 st.divider()
 
-
-# ===============================
-# MODIFICAR / ELIMINAR
-# ===============================
+# =====================================================
+# EDITAR / ELIMINAR
+# =====================================================
 st.subheader("✏️ Modificar / 🗑️ Eliminar proyecto")
 
-proyecto_sel = st.selectbox(
+fila = st.selectbox(
     "Selecciona un proyecto",
-    proyectos,
-    format_func=lambda p: f"{p[1]} ({p[4]} → {p[5]})"
+    df.itertuples(index=False),
+    format_func=lambda p: f"{p.nombre} ({p.inicio} → {p.fin})"
 )
 
-pid, nombre, codigo, estado, inicio, fin, confirmado = proyecto_sel
-
+pid = fila.id
 
 with st.form("form_modificar"):
-    nuevo_nombre = st.text_input("Nombre", nombre)
-    nuevo_inicio = st.date_input("Inicio", inicio)
-    nuevo_fin = st.date_input("Fin", fin)
-    nuevo_confirmado = st.checkbox("Confirmado", bool(confirmado))
+    nuevo_nombre = st.text_input("Nombre", fila.nombre)
+    nuevo_inicio = st.date_input("Inicio", fila.inicio)
+    nuevo_fin = st.date_input("Fin", fila.fin)
+    nuevo_confirmado = st.checkbox("Confirmado", fila.confirmado)
 
     col1, col2 = st.columns(2)
 
@@ -178,10 +95,9 @@ with st.form("form_modificar"):
     with col2:
         eliminar = st.form_submit_button("🗑️ Eliminar proyecto")
 
-
-# ===============================
-# GUARDAR CAMBIOS
-# ===============================
+# =====================================================
+# GUARDAR
+# =====================================================
 if guardar:
     if not tiene_permiso(st.session_state.rol, "editar_proyecto"):
         st.error("⛔ No tienes permiso para editar")
@@ -192,21 +108,20 @@ if guardar:
         nuevo_nombre,
         nuevo_inicio,
         nuevo_fin,
-        int(nuevo_confirmado),
-        st.session_state["user_id"]
+        nuevo_confirmado,
+        st.session_state.usuario_id
     )
     st.success("Proyecto actualizado")
     st.rerun()
 
-
-# ===============================
-# ELIMINAR PROYECTO
-# ===============================
+# =====================================================
+# ELIMINAR
+# =====================================================
 if eliminar:
     if not tiene_permiso(st.session_state.rol, "eliminar_proyecto"):
         st.error("⛔ Solo administrador puede eliminar")
         st.stop()
 
-    eliminar_proyecto(pid, st.session_state["user_id"])
+    eliminar_proyecto(pid, st.session_state.usuario_id)
     st.success("Proyecto eliminado")
     st.rerun()
