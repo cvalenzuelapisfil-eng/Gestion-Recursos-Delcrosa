@@ -1,36 +1,56 @@
 import streamlit as st
-from database import crear_tablas_y_seed
-from logic import obtener_personal, marcar_disponible, marcar_no_disponible
+from logic import validar_usuario
 
 st.set_page_config(
     page_title="Gestión de Recursos",
     layout="wide"
 )
 
-# 🔥 ESTO SOLUCIONA TODO
-crear_tablas_y_seed()
+# ---------------------------
+# SESSION STATE
+# ---------------------------
+if "usuario" not in st.session_state:
+    st.session_state.usuario = None
+    st.session_state.rol = None
+    st.session_state.user_id = None
 
-st.title("👷 Gestión de Personal")
+# ---------------------------
+# LOGIN
+# ---------------------------
+def login():
+    st.title("🔐 Iniciar sesión")
 
-personal = obtener_personal()
+    usuario = st.text_input("Usuario")
+    password = st.text_input("Contraseña", type="password")
 
-st.subheader("Listado General")
+    if st.button("Ingresar"):
+        try:
+            user = validar_usuario(usuario, password)
 
-for pid, nombre, cargo, area, disponible in personal:
-    col1, col2, col3, col4, col5 = st.columns([3,3,3,2,2])
+            if user:
+                st.session_state.user_id = user[0]
+                st.session_state.usuario = user[1]
+                st.session_state.rol = user[2]
+                st.rerun()
+            else:
+                st.error("Credenciales inválidas")
 
-    col1.write(nombre)
-    col2.write(cargo)
-    col3.write(area)
+        except Exception as e:
+            st.error("Error conectando con la base de datos")
+            st.exception(e)
 
-    if disponible:
-        col4.success("Disponible")
-        if col5.button("Asignar", key=f"a{pid}"):
-            marcar_no_disponible(pid)
-            st.experimental_rerun()
-    else:
-        col4.error("Ocupado")
-        if col5.button("Liberar", key=f"l{pid}"):
-            marcar_disponible(pid)
-            st.experimental_rerun()
+# ---------------------------
+# BLOQUEO TOTAL SIN LOGIN
+# ---------------------------
+if not st.session_state.usuario:
+    login()
+    st.stop()
 
+# ---------------------------
+# APP PRINCIPAL
+# ---------------------------
+st.sidebar.success(f"👤 {st.session_state.usuario}")
+st.sidebar.info("Usa el menú lateral para navegar")
+
+st.title("📌 Sistema de Gestión de Recursos")
+st.write("Selecciona una opción en el menú lateral 👈")

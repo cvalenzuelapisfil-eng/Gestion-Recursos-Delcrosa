@@ -1,49 +1,58 @@
-from database import conectar, crear_tablas
+import sqlite3
+from pathlib import Path
 
-personal = [
-    ("Cinthya Bellido", "Administradora", "Oficina"),
-    ("Antonio Velasco", "Jefe de Servicios", "Servicios"),
-    ("Christian Valenzuela", "Coord. Servicios", "Servicios"),
-    ("Marco Subelete", "Coord. Servicios", "Servicios"),
-    ("Juan Espinoza", "Ing. Comunicación", "Ingeniería"),
-    ("Juan Pilco", "Ing. Sup. Servicios", "Ingeniería"),
-    ("Wilber Chiclla", "Ing. Sup. Servicios", "Ingeniería"),
-    ("Luis Flores", "Sup. Seguridad", "Seguridad"),
-    ("Victor Salazar", "Sup. Seguridad", "Seguridad"),
-    ("Lilian Huaman", "Sup. Seguridad", "Seguridad"),
-    ("Tec. Juan Sunción", "Sup. Técnico", "Técnico"),
-    ("Tec. Henry Sandoval", "Sup. Técnico", "Técnico"),
-    ("Tec. Miguel Conyas", "Técnico", "Técnico"),
-    ("Tec. Edinson Morales", "Técnico", "Técnico"),
-    ("Tec. Luis Martinez", "Técnico", "Técnico"),
-    ("Tec. Darwin Araujo", "Técnico / Rigger", "Técnico"),
-    ("Tec. Christian Rivas", "Técnico", "Técnico"),
-    ("Tec. Alex Palomino", "Técnico", "Técnico"),
-    ("Tec. Percy Ugarte", "Técnico", "Técnico"),
-    ("Tec. Saul Sotelo", "Técnico", "Técnico"),
-    ("Tec. Taipe Opver", "Técnico", "Técnico"),
-    ("Tec. Tito Melendez", "Técnico", "Técnico"),
-    ("Tec. Danny Condor", "Técnico", "Técnico"),
-    ("Tec. Karlo", "Técnico", "Técnico"),
-    ("Tec. Deivis Rivera Guerrero", "Técnico", "Técnico"),
-    ("Everly Tapia", "Conductor", "Movilidad"),
-    ("Segundo Gícaro", "Camión Grúa", "Obras"),
-    ("Wiler Coppa", "Coord. Servicios", "Arequipa"),
-    ("Kelly Luna", "Sup. Seguridad", "Arequipa")
-]
+DB_PATH = Path("data/gestion.db")
+DB_PATH.parent.mkdir(exist_ok=True)
 
-crear_tablas()
-conn = conectar()
-c = conn.cursor()
+def get_connection():
+    return sqlite3.connect(DB_PATH)
 
-for nombre, cargo, area in personal:
-    c.execute(
-        "INSERT INTO personal (nombre, cargo, area, disponible) VALUES (?, ?, ?, 1)",
-        (nombre, cargo, area)
+def crear_tablas():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS personal (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        cargo TEXT,
+        area TEXT,
+        disponible INTEGER DEFAULT 1
     )
+    """)
 
-conn.commit()
-conn.close()
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS proyectos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        codigo TEXT,
+        estado TEXT,
+        inicio DATE,
+        fin DATE,
+        eliminado INTEGER DEFAULT 0
+    )
+    """)
 
-print("✔ Personal cargado correctamente")
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS asignaciones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        personal_id INTEGER,
+        proyecto_id INTEGER,
+        inicio DATE,
+        fin DATE,
+        activa INTEGER DEFAULT 1
+    )
+    """)
 
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario TEXT UNIQUE,
+        password_hash TEXT,
+        rol TEXT,
+        activo INTEGER DEFAULT 1
+    )
+    """)
+
+    conn.commit()
+    conn.close()
