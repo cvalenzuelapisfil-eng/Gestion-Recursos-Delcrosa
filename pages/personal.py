@@ -26,8 +26,8 @@ df = pd.read_sql("""
                 FROM asignaciones a
                 JOIN proyectos pr ON pr.id = a.proyecto_id
                 WHERE a.personal_id = p.id
-                AND a.activa = 1
-                AND pr.eliminado = 0
+                AND a.activa = TRUE
+                AND pr.eliminado = FALSE
                 AND a.fin >= CURRENT_DATE
             )
             THEN 'Ocupado'
@@ -63,7 +63,6 @@ st.divider()
 st.subheader("✏️ Modificar datos del personal")
 
 if not df.empty:
-    # Selector de persona
     persona_map = {
         f"{row['nombre']} ({row['cargo']})": row["id"]
         for _, row in df.iterrows()
@@ -88,8 +87,8 @@ if not df.empty:
             c = conn.cursor()
             c.execute("""
                 UPDATE personal
-                SET nombre = ?, cargo = ?, area = ?
-                WHERE id = ?
+                SET nombre = %s, cargo = %s, area = %s
+                WHERE id = %s
             """, (nombre.strip(), cargo.strip(), area.strip(), persona_id))
             conn.commit()
 
