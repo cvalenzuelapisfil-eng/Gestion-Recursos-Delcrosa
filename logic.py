@@ -605,6 +605,145 @@ def kpi_proyectos_confirmados():
 
     return confirmados, no_confirmados
 
+# =====================================================
+# USUARIOS
+# =====================================================
+
+def obtener_usuarios():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, usuario, rol, activo
+        FROM usuarios
+        ORDER BY usuario
+    """, conn)
+    cerrar(conn)
+    return df
+
+
+def crear_usuario(usuario, password, rol):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO usuarios (usuario, password_hash, rol, activo)
+        VALUES (%s, %s, %s, TRUE)
+    """, (usuario, hash_password(password), rol))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+def cambiar_password(user_id, nueva_password):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE usuarios
+        SET password_hash = %s
+        WHERE id = %s
+    """, (hash_password(nueva_password), user_id))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+def cambiar_rol(user_id, nuevo_rol):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE usuarios
+        SET rol = %s
+        WHERE id = %s
+    """, (nuevo_rol, user_id))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+def cambiar_estado(user_id, activo):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE usuarios
+        SET activo = %s
+        WHERE id = %s
+    """, (activo, user_id))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+# =====================================================
+# ALERTAS
+# =====================================================
+
+def obtener_alertas_por_persona(personal_id=None):
+    conn = get_connection()
+
+    if personal_id:
+        df = pd.read_sql("""
+            SELECT pe.nombre, pr.nombre AS proyecto, a.inicio, a.fin
+            FROM asignaciones a
+            JOIN personal pe ON pe.id = a.personal_id
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.activa = TRUE
+              AND a.fin < CURRENT_DATE
+              AND pe.id = %s
+        """, conn, params=(personal_id,))
+    else:
+        df = pd.read_sql("""
+            SELECT pe.nombre, pr.nombre AS proyecto, a.inicio, a.fin
+            FROM asignaciones a
+            JOIN personal pe ON pe.id = a.personal_id
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.activa = TRUE
+              AND a.fin < CURRENT_DATE
+        """, conn)
+
+    cerrar(conn)
+
+    alertas = []
+    for _, r in df.iterrows():
+        alertas.append(
+            f"{r['nombre']} tiene asignación vencida en {r['proyecto']}"
+        )
+
+    return alertas
+
+
+# =====================================================
+# GANTT POR PERSONA
+# =====================================================
+
+def proyectos_gantt_por_persona(personal_id=None):
+    conn = get_connection()
+
+    if personal_id:
+        df = pd.read_sql("""
+            SELECT pr.nombre, a.inicio, a.fin,
+                   CASE WHEN pr.confirmado THEN 'Confirmado'
+                        ELSE 'No confirmado' END AS confirmacion
+            FROM asignaciones a
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.activa = TRUE
+              AND pr.eliminado = FALSE
+              AND a.personal_id = %s
+        """, conn, params=(personal_id,))
+    else:
+        df = pd.read_sql("""
+            SELECT pr.nombre, a.inicio, a.fin,
+                   CASE WHEN pr.confirmado THEN 'Confirmado'
+                        ELSE 'No confirmado' END AS confirmacion
+            FROM asignaciones a
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.activa = TRUE
+              AND pr.eliminado = FALSE
+        """, conn)
+
+    cerrar(conn)
+    return df
 
 # =====================================================
 # PERSONAL
