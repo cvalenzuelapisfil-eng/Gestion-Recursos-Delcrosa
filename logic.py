@@ -187,3 +187,56 @@ def asignar_personal(proyecto_id, personal_ids, inicio, fin, usuario=None):
 
     conn.commit()
     cerrar(conn, cur)
+
+    # =====================================================
+# OBTENER PERSONAL
+# =====================================================
+def obtener_personal():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, nombre, rol, activo
+        FROM personal
+        ORDER BY nombre
+    """, conn)
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# VERIFICAR SOLAPAMIENTO
+# =====================================================
+def hay_solapamiento(personal_id, inicio, fin):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM asignaciones
+        WHERE personal_id = %s
+          AND activa = TRUE
+          AND inicio <= %s
+          AND fin >= %s
+    """, (personal_id, fin, inicio))
+
+    existe = cur.fetchone()[0] > 0
+    cerrar(conn, cur)
+    return existe
+
+
+# =====================================================
+# OBTENER ASIGNACIONES ACTIVAS
+# =====================================================
+def obtener_asignaciones_activas():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT a.id, p.nombre AS personal, pr.nombre AS proyecto,
+               a.inicio, a.fin
+        FROM asignaciones a
+        JOIN personal p ON a.personal_id = p.id
+        JOIN proyectos pr ON a.proyecto_id = pr.id
+        WHERE a.activa = TRUE
+        ORDER BY a.inicio
+    """, conn)
+    cerrar(conn)
+    return df
+
