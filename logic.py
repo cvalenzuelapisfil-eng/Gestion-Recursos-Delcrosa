@@ -358,4 +358,4 @@ cur = conn.cursor()
     cerrar(conn, cur)
 except Exception:
     pass
-```
+
