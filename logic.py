@@ -298,3 +298,52 @@ def obtener_usuarios():
     if df is None:
         return pd.DataFrame(columns=["id", "usuario", "rol", "activo"])
     return df
+
+# =====================================================
+# FUNCIONES FALTANTES PARA ASIGNACIONES.PY
+# =====================================================
+
+def sugerir_personal(proyecto_id=None, inicio=None, fin=None):
+    """
+    Motor básico de sugerencia: devuelve personal disponible
+    """
+    try:
+        df = obtener_personal_disponible(inicio, fin)
+        if df is None or len(df) == 0:
+            return pd.DataFrame(columns=["id", "nombre"])
+        return df.head(5)
+    except:
+        return pd.DataFrame(columns=["id", "nombre"])
+
+
+def calendario_recursos(inicio=None, fin=None):
+    """
+    Datos para calendario de recursos
+    """
+    try:
+        return obtener_asignaciones_activas()
+    except:
+        return pd.DataFrame(columns=["id", "personal", "proyecto", "inicio", "fin"])
+
+
+def obtener_asignaciones_activas():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT a.id,
+               p.nombre AS personal,
+               pr.nombre AS proyecto,
+               a.inicio,
+               a.fin
+        FROM asignaciones a
+        JOIN personal p ON a.personal_id = p.id
+        JOIN proyectos pr ON a.proyecto_id = pr.id
+        WHERE a.activa = TRUE
+        ORDER BY a.inicio
+    """, conn)
+    cerrar(conn)
+
+    if df is None:
+        return pd.DataFrame(columns=["id", "personal", "proyecto", "inicio", "fin"])
+
+    return df
+
