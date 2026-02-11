@@ -1,5 +1,6 @@
 import hashlib
-from datetime import datetime, timedelta, date
+import secrets
+from datetime import datetime, timedelta
 import pandas as pd
 import streamlit as st
 from database import get_connection
@@ -62,11 +63,15 @@ def validar_usuario(usuario, password):
 # ROLES
 # =====================================================
 PERMISOS = {
-    "admin": {"ver_dashboard","gestionar_usuarios","crear_proyecto",
-              "editar_proyecto","eliminar_proyecto","asignar_personal",
-              "editar_personal","ver_auditoria"},
-    "gestor": {"ver_dashboard","crear_proyecto","editar_proyecto",
-               "asignar_personal","editar_personal"},
+    "admin": {
+        "ver_dashboard", "gestionar_usuarios", "crear_proyecto",
+        "editar_proyecto", "eliminar_proyecto", "asignar_personal",
+        "editar_personal", "ver_auditoria"
+    },
+    "gestor": {
+        "ver_dashboard", "crear_proyecto",
+        "editar_proyecto", "asignar_personal", "editar_personal"
+    },
     "usuario": {"ver_dashboard"}
 }
 
@@ -110,10 +115,7 @@ def obtener_personal_disponible(inicio, fin):
     return df
 
 
-# =====================================================
-# CARGA %
-# =====================================================
-def obtener_carga_personal(personal_id):
+def obtener_carga_personal(pid):
     conn = get_connection()
     cur = conn.cursor()
 
@@ -122,12 +124,12 @@ def obtener_carga_personal(personal_id):
         FROM asignaciones
         WHERE personal_id=%s AND activa=TRUE
         AND fin>=CURRENT_DATE
-    """, (personal_id,))
+    """, (pid,))
 
     total = cur.fetchone()[0]
     cerrar(conn, cur)
 
-    return min(total * 20, 100)  # simulación %
+    return min(total * 20, 100)
 
 
 # =====================================================
@@ -145,7 +147,7 @@ def obtener_proyectos():
     return df
 
 
-def crear_proyecto(nombre, inicio, fin, confirmado, usuario_id):
+def crear_proyecto(nombre, inicio, fin, confirmado, uid):
     conn = get_connection()
     cur = conn.cursor()
 
@@ -175,7 +177,6 @@ def modificar_proyecto(pid, nombre, inicio, fin, confirmado, uid):
 def eliminar_proyecto(pid, uid):
     conn = get_connection()
     cur = conn.cursor()
-
     cur.execute("UPDATE proyectos SET eliminado=TRUE WHERE id=%s", (pid,))
     conn.commit()
     cerrar(conn, cur)
@@ -217,10 +218,10 @@ def hay_solapamiento(pid, inicio, fin):
 def obtener_asignaciones_activas():
     conn = get_connection()
     df = pd.read_sql("""
-        SELECT p.nombre AS "Personal",
-               pr.nombre AS "Proyecto",
-               a.inicio AS "Inicio",
-               a.fin AS "Fin"
+        SELECT p.nombre AS personal,
+               pr.nombre AS proyecto,
+               a.inicio,
+               a.fin
         FROM asignaciones a
         JOIN personal p ON p.id=a.personal_id
         JOIN proyectos pr ON pr.id=a.proyecto_id
@@ -230,7 +231,7 @@ def obtener_asignaciones_activas():
     return df
 
 
-def calendario_recursos(inicio=None, fin=None):
+def calendario_recursos(*args, **kwargs):
     return obtener_asignaciones_activas()
 
 
@@ -239,52 +240,19 @@ def sugerir_personal(*args, **kwargs):
 
 
 # =====================================================
-# KPI DASHBOARD
-# =====================================================
-def kpi_proyectos():
-    df = obtener_proyectos()
-    activos = len(df)
-    return activos, 0
-
-
-def kpi_personal():
-    df = obtener_personal()
-    total = len(df)
-    return total, 0, 0
-
-
-def kpi_asignaciones():
-    return len(obtener_asignaciones_activas())
-
-
-def kpi_solapamientos():
-    return 0
-
-
-def kpi_proyectos_confirmados():
-    df = obtener_proyectos()
-    return int(df["confirmado"].sum()), 0
-
-
-def obtener_alertas_por_persona(pid=None):
-    return []
-
-
-def proyectos_gantt_por_persona(pid=None):
-    return obtener_proyectos()
-
-
-# =====================================================
 # USUARIOS
 # =====================================================
 def obtener_usuarios():
     conn = get_connection()
-    df = pd.read_sql("SELECT id,usuario,rol,activo FROM usuarios", conn)
+    df = pd.read_sql("SELECT id,usuario,rol,activo,email FROM usuarios ORDER BY usuario", conn)
     cerrar(conn)
     return df
 
 
-def crear_usuario(usuario, password, rol):
+def crear_usuario(usuario, password, rol, creador_id=None):
+    if st.session_state.rol != "admin":
+        raise Exception("Solo admin puede crear usuarios")
+
     conn = get_connection()
     cur = conn.cursor()
 
@@ -297,12 +265,18 @@ def crear_usuario(usuario, password, rol):
     cerrar(conn, cur)
 
 
-def cambiar_password(uid, pwd):
+def cambiar_password(uid, pwd, solicitante_id=None):
+    if st.session_state.user_id != uid and st.session_state.rol != "admin":
+        raise Exception("No autorizado")
+
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("UPDATE usuarios SET password_hash=%s WHERE id=%s",
-                (hash_password(pwd), uid))
+    cur.execute("""
+        UPDATE usuarios
+        SET password_hash=%s
+        WHERE id=%s
+    """, (hash_password(pwd), uid))
 
     conn.commit()
     cerrar(conn, cur)
@@ -322,6 +296,58 @@ def cambiar_estado(uid, activo):
     cur.execute("UPDATE usuarios SET activo=%s WHERE id=%s", (activo, uid))
     conn.commit()
     cerrar(conn, cur)
+
+
+# =====================================================
+# RESET PASSWORD POR EMAIL (PREPARADO)
+# =====================================================
+def generar_token_reset(email):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    token = secrets.token_urlsafe(32)
+    expira = datetime.now() + timedelta(minutes=30)
+
+    cur.execute("""
+        UPDATE usuarios
+        SET reset_token=%s, reset_expira=%s
+        WHERE email=%s
+    """, (token, expira, email))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    return token
+
+
+def reset_password_por_token(token, nueva_password):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id FROM usuarios
+        WHERE reset_token=%s AND reset_expira > NOW()
+    """, (token,))
+    row = cur.fetchone()
+
+    if not row:
+        cerrar(conn, cur)
+        return False
+
+    uid = row[0]
+
+    cur.execute("""
+        UPDATE usuarios
+        SET password_hash=%s,
+            reset_token=NULL,
+            reset_expira=NULL
+        WHERE id=%s
+    """, (hash_password(nueva_password), uid))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    return True
 
 
 # =====================================================
