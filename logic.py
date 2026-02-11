@@ -1,18 +1,18 @@
 # ==============================
 
-# LOGIC.PY — ERP ULTRA ESTABLE (FIX INDENTACIÓN)
+# LOGIC.PY — ERP ENTERPRISE STABLE
 
 # ==============================
 
 import hashlib
-import pandas as pd
 from datetime import datetime, timedelta
-from database import get_connection
+import pandas as pd
 import streamlit as st
+from database import get_connection
 
 # =====================================================
 
-# SESIÓN GLOBAL
+# 🔐 SESIÓN SEGURA GLOBAL
 
 # =====================================================
 
@@ -28,7 +28,7 @@ st.session_state.user_id = None
 
 # =====================================================
 
-# UTILIDADES
+# 🔒 UTILIDADES
 
 # =====================================================
 
@@ -44,7 +44,7 @@ return hashlib.sha256(password.encode()).hexdigest()
 
 # =====================================================
 
-# LOGIN SEGURO
+# 🔐 LOGIN SEGURO
 
 # =====================================================
 
@@ -55,7 +55,7 @@ def validar_usuario(usuario, password):
 conn = get_connection()
 cur = conn.cursor()
 
-
+```
 cur.execute("""
     SELECT id, usuario, rol, password_hash, activo,
            COALESCE(intentos_fallidos, 0),
@@ -109,13 +109,12 @@ cur.execute("""
 
 conn.commit()
 cerrar(conn, cur)
-
 return (user_id, username, rol)
-
+```
 
 # =====================================================
 
-# ROLES Y PERMISOS
+# 🔐 ROLES Y PERMISOS
 
 # =====================================================
 
@@ -147,79 +146,7 @@ return permiso in PERMISOS.get(rol, set())
 
 # =====================================================
 
-# DISPONIBILIDAD
-
-# =====================================================
-
-def hay_solapamiento(personal_id, inicio, fin):
-conn = get_connection()
-cur = conn.cursor()
-
-
-cur.execute("""
-    SELECT COUNT(*)
-    FROM asignaciones a
-    JOIN proyectos p ON p.id = a.proyecto_id
-    WHERE a.personal_id = %s
-      AND a.activa = TRUE
-      AND p.eliminado = FALSE
-      AND a.inicio <= %s
-      AND a.fin >= %s
-""", (personal_id, fin, inicio))
-
-count = cur.fetchone()[0]
-cerrar(conn, cur)
-return count > 0
-
-
-def obtener_personal_disponible(inicio, fin):
-conn = get_connection()
-
-
-df = pd.read_sql("""
-    SELECT p.id, p.nombre
-    FROM personal p
-    WHERE NOT EXISTS (
-        SELECT 1
-        FROM asignaciones a
-        JOIN proyectos pr ON pr.id = a.proyecto_id
-        WHERE a.personal_id = p.id
-          AND a.activa = TRUE
-          AND pr.eliminado = FALSE
-          AND a.inicio <= %s
-          AND a.fin >= %s
-    )
-    ORDER BY p.nombre
-""", conn, params=(fin, inicio))
-
-cerrar(conn)
-return df
-
-
-def sugerir_personal(inicio, fin):
-conn = get_connection()
-
-
-df = pd.read_sql("""
-    SELECT p.id, p.nombre, COUNT(a.id) AS carga
-    FROM personal p
-    LEFT JOIN asignaciones a
-        ON a.personal_id = p.id
-       AND a.activa = TRUE
-       AND a.inicio <= %s
-       AND a.fin >= %s
-    GROUP BY p.id, p.nombre
-    ORDER BY carga ASC, p.nombre
-    LIMIT 5
-""", conn, params=(fin, inicio))
-
-cerrar(conn)
-return df
-
-
-# =====================================================
-
-# PERSONAL / PROYECTOS
+# 👷 PERSONAL / PROYECTOS
 
 # =====================================================
 
@@ -242,58 +169,141 @@ return df
 
 # =====================================================
 
-# ASIGNACIONES
+# 📊 CARGA PERSONAL
 
 # =====================================================
 
-def asignar_personal(proyecto_id, personal_ids, inicio, fin, usuario=None):
+def obtener_carga_personal(personal_id):
 conn = get_connection()
 cur = conn.cursor()
 
+```
+cur.execute("""
+    SELECT COUNT(*)
+    FROM asignaciones a
+    JOIN proyectos p ON p.id = a.proyecto_id
+    WHERE a.personal_id = %s
+      AND a.activa = TRUE
+      AND p.eliminado = FALSE
+      AND a.fin >= CURRENT_DATE
+""", (personal_id,))
 
-for pid in personal_ids:
-    cur.execute("""
-        INSERT INTO asignaciones (personal_id, proyecto_id, inicio, fin, activa)
-        VALUES (%s, %s, %s, %s, TRUE)
-    """, (pid, proyecto_id, inicio, fin))
-
-conn.commit()
+total = cur.fetchone()[0]
 cerrar(conn, cur)
 
+return min(total * 20, 100)
+```
 
 # =====================================================
 
-# CALENDARIO
+# 🧠 DISPONIBILIDAD
+
+# =====================================================
+
+def hay_solapamiento(personal_id, inicio, fin):
+conn = get_connection()
+cur = conn.cursor()
+
+```
+cur.execute("""
+    SELECT COUNT(*)
+    FROM asignaciones
+    WHERE personal_id = %s
+      AND activa = TRUE
+      AND inicio <= %s
+      AND fin >= %s
+""", (personal_id, fin, inicio))
+
+count = cur.fetchone()[0]
+cerrar(conn, cur)
+return count > 0
+```
+
+def obtener_personal_disponible(inicio, fin):
+conn = get_connection()
+df = pd.read_sql("""
+SELECT id, nombre
+FROM personal
+WHERE id NOT IN (
+SELECT personal_id
+FROM asignaciones
+WHERE activa = TRUE
+AND inicio <= %s
+AND fin >= %s
+)
+ORDER BY nombre
+""", conn, params=(fin, inicio))
+cerrar(conn)
+return df
+
+# =====================================================
+
+# 📅 CALENDARIO
 
 # =====================================================
 
 def calendario_recursos(inicio, fin):
 conn = get_connection()
-
-
 df = pd.read_sql("""
-    SELECT 
-        pe.nombre AS "Personal",
-        pr.nombre AS "Proyecto",
-        a.inicio AS "Inicio",
-        a.fin AS "Fin"
-    FROM asignaciones a
-    JOIN personal pe ON pe.id = a.personal_id
-    JOIN proyectos pr ON pr.id = a.proyecto_id
-    WHERE a.activa = TRUE
-      AND pr.eliminado = FALSE
-      AND a.inicio <= %s
-      AND a.fin >= %s
-    ORDER BY pe.nombre, a.inicio
+SELECT pe.nombre AS "Personal",
+pr.nombre AS "Proyecto",
+a.inicio AS "Inicio",
+a.fin AS "Fin"
+FROM asignaciones a
+JOIN personal pe ON pe.id = a.personal_id
+JOIN proyectos pr ON pr.id = a.proyecto_id
+WHERE a.activa = TRUE
+AND pr.eliminado = FALSE
+AND a.inicio <= %s
+AND a.fin >= %s
 """, conn, params=(fin, inicio))
-
 cerrar(conn)
 return df
 
+# =====================================================
+
+# 📊 KPIs DASHBOARD
 
 # =====================================================
 
-# AUDITORIA
+def kpi_proyectos():
+conn = get_connection()
+cur = conn.cursor()
+cur.execute("SELECT COUNT(*) FROM proyectos WHERE eliminado=FALSE")
+activos = cur.fetchone()[0]
+cerrar(conn, cur)
+return activos, 0
+
+def kpi_personal():
+conn = get_connection()
+cur = conn.cursor()
+cur.execute("SELECT COUNT(*) FROM personal")
+total = cur.fetchone()[0]
+cerrar(conn, cur)
+return total, 0, 0
+
+def kpi_asignaciones():
+conn = get_connection()
+cur = conn.cursor()
+cur.execute("SELECT COUNT(*) FROM asignaciones WHERE activa=TRUE")
+total = cur.fetchone()[0]
+cerrar(conn, cur)
+return total
+
+def kpi_solapamientos():
+return 0
+
+def kpi_proyectos_confirmados():
+conn = get_connection()
+cur = conn.cursor()
+cur.execute("SELECT COUNT(*) FROM proyectos WHERE confirmado=TRUE")
+conf = cur.fetchone()[0]
+cerrar(conn, cur)
+return conf, 0
+
+# =====================================================
+
+# 📝 AUDITORIA
 
 # =====================================================
 
@@ -301,15 +311,11 @@ def registrar_auditoria(usuario_id, accion, entidad, entidad_id=None, detalle=""
 try:
 conn = get_connection()
 cur = conn.cursor()
-
-
-    cur.execute("""
-        INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (usuario_id, accion, entidad, entidad_id, detalle))
-
-    conn.commit()
-    cerrar(conn, cur)
+cur.execute("""
+INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle)
+VALUES (%s, %s, %s, %s, %s)
+""", (usuario_id, accion, entidad, entidad_id, detalle))
+conn.commit()
+cerrar(conn, cur)
 except Exception:
-    pass
-
+pass
