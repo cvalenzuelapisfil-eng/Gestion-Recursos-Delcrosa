@@ -125,34 +125,6 @@ def tiene_permiso(rol, permiso):
 
 
 # =====================================================
-# PROYECTOS
-# =====================================================
-def obtener_proyectos():
-    conn = get_connection()
-    df = pd.read_sql("""
-        SELECT id, nombre, codigo, estado, inicio, fin, confirmado
-        FROM proyectos
-        WHERE eliminado = FALSE
-        ORDER BY inicio DESC
-    """, conn)
-    cerrar(conn)
-    return df
-
-
-def crear_proyecto(nombre, codigo, inicio, fin, usuario=None):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        INSERT INTO proyectos (nombre, codigo, inicio, fin, estado, confirmado, eliminado)
-        VALUES (%s, %s, %s, %s, 'planificado', FALSE, FALSE)
-    """, (nombre, codigo, inicio, fin))
-
-    conn.commit()
-    cerrar(conn, cur)
-
-
-# =====================================================
 # PERSONAL
 # =====================================================
 def obtener_personal():
@@ -163,6 +135,22 @@ def obtener_personal():
         ORDER BY nombre
     """, conn)
     cerrar(conn)
+    if df is None:
+        return pd.DataFrame(columns=["id", "nombre", "rol", "activo"])
+    return df
+
+
+def obtener_personal_dashboard():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, nombre
+        FROM personal
+        WHERE activo = TRUE
+        ORDER BY nombre
+    """, conn)
+    cerrar(conn)
+    if df is None or len(df) == 0:
+        return pd.DataFrame(columns=["id", "nombre"])
     return df
 
 
@@ -182,9 +170,44 @@ def obtener_personal_disponible(inicio, fin):
         ORDER BY nombre
     """, conn, params=(fin, inicio))
     cerrar(conn)
+    if df is None:
+        return pd.DataFrame(columns=["id", "nombre"])
     return df
 
 
+# =====================================================
+# PROYECTOS
+# =====================================================
+def obtener_proyectos():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, nombre, codigo, estado, inicio, fin, confirmado
+        FROM proyectos
+        WHERE eliminado = FALSE
+        ORDER BY inicio DESC
+    """, conn)
+    cerrar(conn)
+    if df is None:
+        return pd.DataFrame(columns=["id", "nombre", "codigo", "estado", "inicio", "fin", "confirmado"])
+    return df
+
+
+def crear_proyecto(nombre, codigo, inicio, fin, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO proyectos (nombre, codigo, inicio, fin, estado, confirmado, eliminado)
+        VALUES (%s, %s, %s, %s, 'planificado', FALSE, FALSE)
+    """, (nombre, codigo, inicio, fin))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+# =====================================================
+# ASIGNACIONES
+# =====================================================
 def hay_solapamiento(personal_id, inicio, fin):
     conn = get_connection()
     cur = conn.cursor()
@@ -232,21 +255,38 @@ def obtener_asignaciones_activas():
         ORDER BY a.inicio
     """, conn)
     cerrar(conn)
+    if df is None:
+        return pd.DataFrame(columns=["id", "personal", "proyecto", "inicio", "fin"])
     return df
 
 
 # =====================================================
-# FUNCIONES USADAS POR DASHBOARD / PAGES
+# DASHBOARD / KPI
 # =====================================================
 def sugerir_personal(*args, **kwargs):
     df = obtener_personal()
-    return df.head(5) if df is not None else []
+    return df.head(5) if df is not None else pd.DataFrame()
 
 
 def calendario_recursos(*args, **kwargs):
     return obtener_asignaciones_activas()
 
 
+def kpi_proyectos():
+    return len(obtener_proyectos())
+
+
+def kpi_personal():
+    return len(obtener_personal())
+
+
+def kpi_asignaciones():
+    return len(obtener_asignaciones_activas())
+
+
+# =====================================================
+# USUARIOS
+# =====================================================
 def obtener_usuarios():
     conn = get_connection()
     df = pd.read_sql("""
@@ -255,4 +295,6 @@ def obtener_usuarios():
         ORDER BY usuario
     """, conn)
     cerrar(conn)
+    if df is None:
+        return pd.DataFrame(columns=["id", "usuario", "rol", "activo"])
     return df
