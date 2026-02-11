@@ -312,4 +312,112 @@ def asignar_personal(proyecto_id, personal_ids, inicio, fin, usuario=None):
 
     conn.commit()
     cerrar(conn, cur)
+# =====================================================
+# OBTENER PROYECTOS
+# =====================================================
+def obtener_proyectos():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, nombre, codigo, estado, inicio, fin, confirmado
+        FROM proyectos
+        WHERE eliminado = FALSE
+        ORDER BY inicio DESC
+    """, conn)
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# OBTENER PERSONAL
+# =====================================================
+def obtener_personal():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, nombre, rol, activo
+        FROM personal
+        ORDER BY nombre
+    """, conn)
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# OBTENER PERSONAL DISPONIBLE
+# =====================================================
+def obtener_personal_disponible(inicio, fin):
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, nombre
+        FROM personal
+        WHERE activo = TRUE
+          AND id NOT IN (
+              SELECT personal_id
+              FROM asignaciones
+              WHERE activa = TRUE
+                AND inicio <= %s
+                AND fin >= %s
+          )
+        ORDER BY nombre
+    """, conn, params=(fin, inicio))
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# VERIFICAR SOLAPAMIENTO
+# =====================================================
+def hay_solapamiento(personal_id, inicio, fin):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM asignaciones
+        WHERE personal_id = %s
+          AND activa = TRUE
+          AND inicio <= %s
+          AND fin >= %s
+    """, (personal_id, fin, inicio))
+
+    existe = cur.fetchone()[0] > 0
+    cerrar(conn, cur)
+    return existe
+
+
+# =====================================================
+# ASIGNAR PERSONAL
+# =====================================================
+def asignar_personal(proyecto_id, personal_ids, inicio, fin, usuario=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    for pid in personal_ids:
+        cur.execute("""
+            INSERT INTO asignaciones (personal_id, proyecto_id, inicio, fin, activa)
+            VALUES (%s, %s, %s, %s, TRUE)
+        """, (pid, proyecto_id, inicio, fin))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+# =====================================================
+# OBTENER ASIGNACIONES ACTIVAS
+# =====================================================
+def obtener_asignaciones_activas():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT a.id,
+               p.nombre AS personal,
+               pr.nombre AS proyecto,
+               a.inicio,
+               a.fin
+        FROM asignaciones a
+        JOIN personal p ON a.personal_id = p.id
+        JOIN proyectos pr ON a.proyecto_id = pr.id
+        WHERE a.activa = TRUE
+        ORDER BY a.inicio
+    """, conn)
+    cerrar(conn)
+    return df
 
