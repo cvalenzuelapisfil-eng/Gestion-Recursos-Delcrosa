@@ -421,3 +421,77 @@ def obtener_asignaciones_activas():
     cerrar(conn)
     return df
 
+# =====================================================
+# FUNCIONES COMPATIBILIDAD (STUBS SEGUROS)
+# Evitan ImportError si alguna página importa funciones
+# que aún no están implementadas.
+# =====================================================
+
+def obtener_carga_personal(*args, **kwargs):
+    return None
+
+
+def obtener_personal_dashboard(*args, **kwargs):
+    return None
+
+
+def kpi_proyectos(*args, **kwargs):
+    return 0
+
+
+def kpi_personal(*args, **kwargs):
+    return 0
+
+
+def kpi_asignaciones(*args, **kwargs):
+    return 0
+
+
+def kpi_solapamientos(*args, **kwargs):
+    return 0
+
+
+def kpi_proyectos_confirmados(*args, **kwargs):
+    return 0
+
+
+def obtener_alertas_por_persona(*args, **kwargs):
+    return []
+
+
+def proyectos_gantt_por_persona(*args, **kwargs):
+    return None
+
+
+def crear_proyecto(*args, **kwargs):
+    pass
+
+
+def modificar_proyecto(*args, **kwargs):
+    pass
+
+
+def eliminar_proyecto(*args, **kwargs):
+    pass
+
+
+def obtener_usuarios(*args, **kwargs):
+    return None
+
+
+def cambiar_password(*args, **kwargs):
+    pass
+
+
+def cambiar_rol(*args, **kwargs):
+    pass
+
+
+def cambiar_estado(*args, **kwargs):
+    pass
+
+
+def registrar_auditoria(*args, **kwargs):
+    pass
+
+
