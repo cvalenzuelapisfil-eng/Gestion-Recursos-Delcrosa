@@ -43,6 +43,7 @@ def validar_usuario(usuario, password):
         FROM usuarios
         WHERE usuario=%s
     """, (usuario,))
+
     row = cur.fetchone()
 
     if not row:
@@ -89,7 +90,6 @@ def obtener_usuarios():
     return df
 
 
-# 🔐 SOLO ADMIN CREA
 def crear_usuario(usuario, password, rol, email=None):
     if st.session_state.rol != "admin":
         raise Exception("Solo admin puede crear usuarios")
@@ -106,7 +106,6 @@ def crear_usuario(usuario, password, rol, email=None):
     cerrar(conn, cur)
 
 
-# 🔐 CADA USUARIO CAMBIA SU PASSWORD
 def cambiar_password(uid, nueva_password):
     if st.session_state.user_id != uid and st.session_state.rol != "admin":
         raise Exception("No autorizado")
@@ -147,7 +146,7 @@ def cambiar_estado(uid, activo):
 
 
 # =====================================================
-# RESET PASSWORD (EMAIL PREPARADO)
+# RESET PASSWORD
 # =====================================================
 def generar_token_reset(email):
     token = secrets.token_urlsafe(32)
@@ -176,6 +175,7 @@ def reset_password_por_token(token, nueva_password):
         SELECT id FROM usuarios
         WHERE reset_token=%s AND reset_expira > NOW()
     """, (token,))
+
     row = cur.fetchone()
 
     if not row:
@@ -195,6 +195,102 @@ def reset_password_por_token(token, nueva_password):
     conn.commit()
     cerrar(conn, cur)
     return True
+
+
+# =====================================================
+# PERSONAL
+# =====================================================
+def obtener_personal():
+    conn = get_connection()
+    df = pd.read_sql("SELECT id,nombre,cargo,area,activo FROM personal ORDER BY nombre", conn)
+    cerrar(conn)
+    return df
+
+
+def obtener_personal_disponible(inicio, fin):
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT id,nombre
+        FROM personal
+        WHERE activo=TRUE
+        AND id NOT IN (
+            SELECT personal_id
+            FROM asignaciones
+            WHERE activa=TRUE
+            AND inicio<=%s AND fin>=%s
+        )
+        ORDER BY nombre
+    """, conn, params=(fin, inicio))
+
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# PROYECTOS
+# =====================================================
+def obtener_proyectos():
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id,nombre,inicio,fin,confirmado,estado
+        FROM proyectos
+        WHERE eliminado=FALSE
+        ORDER BY inicio DESC
+    """, conn)
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# ASIGNACIONES
+# =====================================================
+def asignar_personal(proyecto_id, personal_ids, inicio, fin):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    for pid in personal_ids:
+        cur.execute("""
+            INSERT INTO asignaciones(personal_id,proyecto_id,inicio,fin,activa)
+            VALUES(%s,%s,%s,%s,TRUE)
+        """, (pid, proyecto_id, inicio, fin))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+def hay_solapamiento(pid, inicio, fin):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM asignaciones
+        WHERE personal_id=%s AND activa=TRUE
+        AND inicio<=%s AND fin>=%s
+    """, (pid, fin, inicio))
+
+    res = cur.fetchone()[0] > 0
+    cerrar(conn, cur)
+    return res
+
+
+def obtener_asignaciones_activas():
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT p.nombre AS personal,
+               pr.nombre AS proyecto,
+               a.inicio,
+               a.fin
+        FROM asignaciones a
+        JOIN personal p ON p.id=a.personal_id
+        JOIN proyectos pr ON pr.id=a.proyecto_id
+        WHERE a.activa=TRUE
+    """, conn)
+
+    cerrar(conn)
+    return df
 
 
 # =====================================================
