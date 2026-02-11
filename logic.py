@@ -55,7 +55,7 @@ def validar_usuario(usuario, password):
 conn = get_connection()
 cur = conn.cursor()
 
-```
+
 cur.execute("""
     SELECT id, usuario, rol, password_hash, activo,
            COALESCE(intentos_fallidos, 0),
@@ -111,7 +111,7 @@ conn.commit()
 cerrar(conn, cur)
 
 return (user_id, username, rol)
-```
+
 
 # =====================================================
 
@@ -155,7 +155,7 @@ def hay_solapamiento(personal_id, inicio, fin):
 conn = get_connection()
 cur = conn.cursor()
 
-```
+
 cur.execute("""
     SELECT COUNT(*)
     FROM asignaciones a
@@ -170,7 +170,58 @@ cur.execute("""
 count = cur.fetchone()[0]
 cerrar(conn, cur)
 return count > 0
-```
+
+
+def obtener_personal_disponible(inicio, fin):
+conn = get_connection()
+
+
+df = pd.read_sql("""
+    SELECT p.id, p.nombre
+    FROM personal p
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM asignaciones a
+        JOIN proyectos pr ON pr.id = a.proyecto_id
+        WHERE a.personal_id = p.id
+          AND a.activa = TRUE
+          AND pr.eliminado = FALSE
+          AND a.inicio <= %s
+          AND a.fin >= %s
+    )
+    ORDER BY p.nombre
+""", conn, params=(fin, inicio))
+
+cerrar(conn)
+return df
+
+
+def sugerir_personal(inicio, fin):
+conn = get_connection()
+
+
+df = pd.read_sql("""
+    SELECT p.id, p.nombre, COUNT(a.id) AS carga
+    FROM personal p
+    LEFT JOIN asignaciones a
+        ON a.personal_id = p.id
+       AND a.activa = TRUE
+       AND a.inicio <= %s
+       AND a.fin >= %s
+    GROUP BY p.id, p.nombre
+    ORDER BY carga ASC, p.nombre
+    LIMIT 5
+""", conn, params=(fin, inicio))
+
+cerrar(conn)
+return df
+
+
+# =====================================================
+
+# PERSONAL / PROYECTOS
+
+# =====================================================
 
 def obtener_personal():
 conn = get_connection()
@@ -191,30 +242,6 @@ return df
 
 # =====================================================
 
-# ERP ULTRA — CARGA
-
-# =====================================================
-
-def obtener_carga_personal(personal_id):
-conn = get_connection()
-cur = conn.cursor()
-
-```
-cur.execute("""
-    SELECT COALESCE(COUNT(*), 0)
-    FROM asignaciones
-    WHERE personal_id = %s
-      AND activa = TRUE
-""", (personal_id,))
-
-carga = cur.fetchone()[0]
-cerrar(conn, cur)
-
-return min(100, carga * 10)
-```
-
-# =====================================================
-
 # ASIGNACIONES
 
 # =====================================================
@@ -223,7 +250,7 @@ def asignar_personal(proyecto_id, personal_ids, inicio, fin, usuario=None):
 conn = get_connection()
 cur = conn.cursor()
 
-```
+
 for pid in personal_ids:
     cur.execute("""
         INSERT INTO asignaciones (personal_id, proyecto_id, inicio, fin, activa)
@@ -232,7 +259,7 @@ for pid in personal_ids:
 
 conn.commit()
 cerrar(conn, cur)
-```
+
 
 # =====================================================
 
@@ -243,7 +270,7 @@ cerrar(conn, cur)
 def calendario_recursos(inicio, fin):
 conn = get_connection()
 
-```
+
 df = pd.read_sql("""
     SELECT 
         pe.nombre AS "Personal",
@@ -262,7 +289,7 @@ df = pd.read_sql("""
 
 cerrar(conn)
 return df
-```
+
 
 # =====================================================
 
@@ -275,7 +302,7 @@ try:
 conn = get_connection()
 cur = conn.cursor()
 
-```
+
     cur.execute("""
         INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle)
         VALUES (%s, %s, %s, %s, %s)
@@ -285,4 +312,4 @@ cur = conn.cursor()
     cerrar(conn, cur)
 except Exception:
     pass
-```
+
