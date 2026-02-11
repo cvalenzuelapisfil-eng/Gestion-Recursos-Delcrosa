@@ -1,6 +1,6 @@
 # ==============================
 
-# LOGIC.PY — ERP ULTRA UNIFICADO
+# LOGIC.PY — ERP ULTRA ESTABLE
 
 # ==============================
 
@@ -12,24 +12,19 @@ import streamlit as st
 
 # =====================================================
 
-# SESIÓN GLOBAL STREAMLIT
+# SESIÓN GLOBAL
 
 # =====================================================
 
 def asegurar_sesion():
 if "autenticado" not in st.session_state:
 st.session_state.autenticado = False
-
-```
 if "usuario" not in st.session_state:
-    st.session_state.usuario = None
-
+st.session_state.usuario = None
 if "rol" not in st.session_state:
-    st.session_state.rol = "publico"
-
+st.session_state.rol = "publico"
 if "user_id" not in st.session_state:
-    st.session_state.user_id = None
-```
+st.session_state.user_id = None
 
 # =====================================================
 
@@ -118,7 +113,6 @@ cerrar(conn, cur)
 return (user_id, username, rol)
 ```
 
-
 # =====================================================
 
 # ROLES Y PERMISOS
@@ -153,7 +147,7 @@ return permiso in PERMISOS.get(rol, set())
 
 # =====================================================
 
-# DISPONIBILIDAD Y SOLAPAMIENTOS
+# DISPONIBILIDAD
 
 # =====================================================
 
@@ -178,102 +172,11 @@ cerrar(conn, cur)
 return count > 0
 ```
 
-def obtener_personal_disponible(inicio, fin):
-conn = get_connection()
-
-```
-df = pd.read_sql("""
-    SELECT p.id, p.nombre
-    FROM personal p
-    WHERE NOT EXISTS (
-        SELECT 1
-        FROM asignaciones a
-        JOIN proyectos pr ON pr.id = a.proyecto_id
-        WHERE a.personal_id = p.id
-          AND a.activa = TRUE
-          AND pr.eliminado = FALSE
-          AND a.inicio <= %s
-          AND a.fin >= %s
-    )
-    ORDER BY p.nombre
-""", conn, params=(fin, inicio))
-
-cerrar(conn)
-return df
-```
-
-def sugerir_personal(inicio, fin):
-conn = get_connection()
-
-```
-df = pd.read_sql("""
-    SELECT p.id, p.nombre, COUNT(a.id) AS carga
-    FROM personal p
-    LEFT JOIN asignaciones a
-        ON a.personal_id = p.id
-       AND a.activa = TRUE
-       AND a.inicio <= %s
-       AND a.fin >= %s
-    GROUP BY p.id, p.nombre
-    ORDER BY carga ASC, p.nombre
-    LIMIT 5
-""", conn, params=(fin, inicio))
-
-cerrar(conn)
-return df
-```
-
-# =====================================================
-
-# ERP ULTRA — CARGA INTELIGENTE
-
-# =====================================================
-
-def obtener_carga_personal(personal_id):
-conn = get_connection()
-cur = conn.cursor()
-
-```
-cur.execute("""
-    SELECT COALESCE(SUM(
-        GREATEST(0, LEAST(fin, CURRENT_DATE + INTERVAL '30 days') - inicio)
-    ), 0)
-    FROM asignaciones
-    WHERE personal_id = %s
-      AND activa = TRUE
-      AND fin >= CURRENT_DATE
-""", (personal_id,))
-
-dias = cur.fetchone()[0] or 0
-cerrar(conn, cur)
-
-carga = int((dias / 30) * 100)
-
-if carga > 100:
-    carga = 100
-if carga < 0:
-    carga = 0
-
-return carga
-```
-
-# =====================================================
-
-# PERSONAL
-
-# =====================================================
-
 def obtener_personal():
 conn = get_connection()
 df = pd.read_sql("SELECT id, nombre FROM personal ORDER BY nombre", conn)
 cerrar(conn)
 return df
-
-# =====================================================
-
-# PROYECTOS
-
-# =====================================================
 
 def obtener_proyectos():
 conn = get_connection()
@@ -285,6 +188,30 @@ ORDER BY inicio DESC
 """, conn)
 cerrar(conn)
 return df
+
+# =====================================================
+
+# ERP ULTRA — CARGA
+
+# =====================================================
+
+def obtener_carga_personal(personal_id):
+conn = get_connection()
+cur = conn.cursor()
+
+```
+cur.execute("""
+    SELECT COALESCE(COUNT(*), 0)
+    FROM asignaciones
+    WHERE personal_id = %s
+      AND activa = TRUE
+""", (personal_id,))
+
+carga = cur.fetchone()[0]
+cerrar(conn, cur)
+
+return min(100, carga * 10)
+```
 
 # =====================================================
 
@@ -309,7 +236,7 @@ cerrar(conn, cur)
 
 # =====================================================
 
-# CALENDARIO (FIX KeyError)
+# CALENDARIO
 
 # =====================================================
 
@@ -358,74 +285,4 @@ cur = conn.cursor()
     cerrar(conn, cur)
 except Exception:
     pass
-
-# =====================================================
-
-# LOGIN SEGURO (FIX IMPORT)
-
-# =====================================================
-
-def validar_usuario(usuario, password):
-from datetime import datetime, timedelta
-
 ```
-conn = get_connection()
-cur = conn.cursor()
-
-cur.execute("""
-    SELECT id, usuario, rol, password_hash, activo,
-           COALESCE(intentos_fallidos, 0),
-           bloqueado_hasta
-    FROM usuarios
-    WHERE usuario = %s
-""", (usuario,))
-
-user = cur.fetchone()
-
-if not user:
-    cerrar(conn, cur)
-    return None
-
-user_id, username, rol, stored_hash, activo, intentos, bloqueado_hasta = user
-
-if not activo:
-    cerrar(conn, cur)
-    return None
-
-if bloqueado_hasta and datetime.now() < bloqueado_hasta:
-    cerrar(conn, cur)
-    return None
-
-if hash_password(password) != stored_hash:
-    intentos += 1
-
-    if intentos >= 5:
-        bloqueo = datetime.now() + timedelta(minutes=10)
-        cur.execute("""
-            UPDATE usuarios
-            SET intentos_fallidos=%s, bloqueado_hasta=%s
-            WHERE id=%s
-        """, (intentos, bloqueo, user_id))
-    else:
-        cur.execute("""
-            UPDATE usuarios
-            SET intentos_fallidos=%s
-            WHERE id=%s
-        """, (intentos, user_id))
-
-    conn.commit()
-    cerrar(conn, cur)
-    return None
-
-cur.execute("""
-    UPDATE usuarios
-    SET intentos_fallidos=0, bloqueado_hasta=NULL
-    WHERE id=%s
-""", (user_id,))
-
-conn.commit()
-cerrar(conn, cur)
-
-return (user_id, username, rol)
-```
-
