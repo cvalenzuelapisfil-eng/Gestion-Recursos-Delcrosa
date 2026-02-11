@@ -6,7 +6,7 @@ from database import get_connection
 
 
 # =====================================================
-# SESIÓN SEGURA
+# SESIÓN
 # =====================================================
 def asegurar_sesion():
     st.session_state.setdefault("autenticado", False)
@@ -96,26 +96,14 @@ def validar_usuario(usuario, password):
 
 
 # =====================================================
-# ROLES
+# ROLES / PERMISOS
 # =====================================================
 PERMISOS = {
-    "admin": {
-        "ver_dashboard",
-        "gestionar_usuarios",
-        "crear_proyecto",
-        "editar_proyecto",
-        "eliminar_proyecto",
-        "asignar_personal",
-        "editar_personal",
-        "ver_auditoria"
-    },
-    "gestor": {
-        "ver_dashboard",
-        "crear_proyecto",
-        "editar_proyecto",
-        "asignar_personal",
-        "editar_personal"
-    },
+    "admin": {"ver_dashboard", "gestionar_usuarios", "crear_proyecto",
+              "editar_proyecto", "eliminar_proyecto",
+              "asignar_personal", "editar_personal", "ver_auditoria"},
+    "gestor": {"ver_dashboard", "crear_proyecto",
+               "editar_proyecto", "asignar_personal", "editar_personal"},
     "usuario": {"ver_dashboard"}
 }
 
@@ -130,24 +118,16 @@ def tiene_permiso(rol, permiso):
 def obtener_personal():
     try:
         conn = get_connection()
-        df = pd.read_sql("""
-            SELECT id, nombre, rol, activo
-            FROM personal
-            ORDER BY nombre
-        """, conn)
+        df = pd.read_sql("SELECT id, nombre, rol, activo FROM personal ORDER BY nombre", conn)
         cerrar(conn)
-        if df is None:
-            return pd.DataFrame(columns=["id", "nombre", "rol", "activo"])
-        return df
+        return df if df is not None else pd.DataFrame(columns=["id", "nombre", "rol", "activo"])
     except:
         return pd.DataFrame(columns=["id", "nombre", "rol", "activo"])
 
 
 def obtener_personal_dashboard():
     df = obtener_personal()
-    if df is None or len(df) == 0:
-        return pd.DataFrame(columns=["id", "nombre"])
-    return df[["id", "nombre"]]
+    return df[["id", "nombre"]] if len(df) > 0 else pd.DataFrame(columns=["id", "nombre"])
 
 
 def obtener_personal_disponible(inicio, fin):
@@ -167,9 +147,7 @@ def obtener_personal_disponible(inicio, fin):
             ORDER BY nombre
         """, conn, params=(fin, inicio))
         cerrar(conn)
-        if df is None:
-            return pd.DataFrame(columns=["id", "nombre"])
-        return df
+        return df if df is not None else pd.DataFrame(columns=["id", "nombre"])
     except:
         return pd.DataFrame(columns=["id", "nombre"])
 
@@ -187,16 +165,12 @@ def obtener_proyectos():
             ORDER BY inicio DESC
         """, conn)
         cerrar(conn)
-        if df is None:
-            return pd.DataFrame(columns=["id", "nombre", "codigo", "estado", "inicio", "fin", "confirmado"])
-        return df
+        return df if df is not None else pd.DataFrame()
     except:
-        return pd.DataFrame(columns=["id", "nombre", "codigo", "estado", "inicio", "fin", "confirmado"])
+        return pd.DataFrame()
 
 
-def crear_proyecto(nombre=None, codigo=None, inicio=None, fin=None, usuario=None):
-    if not nombre:
-        return
+def crear_proyecto(nombre, codigo, inicio, fin, usuario=None):
     try:
         conn = get_connection()
         cur = conn.cursor()
@@ -251,11 +225,7 @@ def obtener_asignaciones_activas():
     try:
         conn = get_connection()
         df = pd.read_sql("""
-            SELECT a.id,
-                   p.nombre AS personal,
-                   pr.nombre AS proyecto,
-                   a.inicio,
-                   a.fin
+            SELECT a.id, p.nombre AS personal, pr.nombre AS proyecto, a.inicio, a.fin
             FROM asignaciones a
             JOIN personal p ON a.personal_id = p.id
             JOIN proyectos pr ON a.proyecto_id = pr.id
@@ -263,93 +233,31 @@ def obtener_asignaciones_activas():
             ORDER BY a.inicio
         """, conn)
         cerrar(conn)
-        if df is None:
-            return pd.DataFrame(columns=["id", "personal", "proyecto", "inicio", "fin"])
-        return df
+        return df if df is not None else pd.DataFrame()
     except:
-        return pd.DataFrame(columns=["id", "personal", "proyecto", "inicio", "fin"])
+        return pd.DataFrame()
 
 
 # =====================================================
-# FUNCIONES DE COMPATIBILIDAD TOTAL
-# (Evitan que cualquier página rompa el app)
+# DASHBOARD / EXTRA
 # =====================================================
 def sugerir_personal(*args, **kwargs):
-    df = obtener_personal()
-    return df.head(5) if df is not None else pd.DataFrame(columns=["id", "nombre"])
+    return obtener_personal().head(5)
 
 
 def calendario_recursos(*args, **kwargs):
     return obtener_asignaciones_activas()
 
 
-def obtener_carga_personal(*args, **kwargs):
-    return pd.DataFrame(columns=["personal", "carga"])
+def obtener_usuarios():
+    try:
+        conn = get_connection()
+        df = pd.read_sql("SELECT id, usuario, rol, activo FROM usuarios ORDER BY usuario", conn)
+        cerrar(conn)
+        return df if df is not None else pd.DataFrame()
+    except:
+        return pd.DataFrame()
 
 
 def registrar_auditoria(*args, **kwargs):
     pass
-
-
-def kpi_proyectos(*args, **kwargs):
-    return len(obtener_proyectos())
-
-
-def kpi_personal(*args, **kwargs):
-    return len(obtener_personal())
-
-
-def kpi_asignaciones(*args, **kwargs):
-    return len(obtener_asignaciones_activas())
-
-
-def kpi_solapamientos(*args, **kwargs):
-    return 0
-
-
-def kpi_proyectos_confirmados(*args, **kwargs):
-    return 0
-
-
-def obtener_alertas_por_persona(*args, **kwargs):
-    return []
-
-
-def proyectos_gantt_por_persona(*args, **kwargs):
-    return pd.DataFrame()
-
-
-def modificar_proyecto(*args, **kwargs):
-    pass
-
-
-def eliminar_proyecto(*args, **kwargs):
-    pass
-
-
-def cambiar_password(*args, **kwargs):
-    pass
-
-
-def cambiar_rol(*args, **kwargs):
-    pass
-
-
-def cambiar_estado(*args, **kwargs):
-    pass
-
-
-def obtener_usuarios():
-    try:
-        conn = get_connection()
-        df = pd.read_sql("""
-            SELECT id, usuario, rol, activo
-            FROM usuarios
-            ORDER BY usuario
-        """, conn)
-        cerrar(conn)
-        if df is None:
-            return pd.DataFrame(columns=["id", "usuario", "rol", "activo"])
-        return df
-    except:
-        return pd.DataFrame(columns=["id", "usuario", "rol", "activo"])
