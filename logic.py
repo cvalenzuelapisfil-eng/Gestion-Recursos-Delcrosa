@@ -222,6 +222,7 @@ def obtener_asignaciones_activas():
     return df
 
 
+
 # =====================================================
 # STUBS COMPATIBILIDAD
 # =====================================================
@@ -242,3 +243,67 @@ def cambiar_password(*args, **kwargs): pass
 def cambiar_rol(*args, **kwargs): pass
 def cambiar_estado(*args, **kwargs): pass
 def registrar_auditoria(*args, **kwargs): pass
+
+# =====================================================
+# FUNCIONES FALTANTES PARA COMPATIBILIDAD TOTAL
+# =====================================================
+
+def sugerir_personal(*args, **kwargs):
+    # Motor básico de sugerencia (no rompe nada)
+    df = obtener_personal()
+    if df is None or len(df) == 0:
+        return []
+    return df.head(5)
+
+
+def calendario_recursos(*args, **kwargs):
+    # Devuelve asignaciones activas para calendario
+    return obtener_asignaciones_activas()
+
+
+def obtener_usuarios(*args, **kwargs):
+    conn = get_connection()
+    df = pd.read_sql("""
+        SELECT id, usuario, rol, activo
+        FROM usuarios
+        ORDER BY usuario
+    """, conn)
+    cerrar(conn)
+    return df
+
+
+def crear_proyecto(nombre=None, codigo=None, inicio=None, fin=None, usuario=None, *args, **kwargs):
+    if not nombre:
+        return
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO proyectos (nombre, codigo, inicio, fin, estado, confirmado, eliminado)
+        VALUES (%s, %s, %s, %s, 'planificado', FALSE, FALSE)
+    """, (nombre, codigo, inicio, fin))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+
+def modificar_proyecto(*args, **kwargs):
+    pass
+
+
+def eliminar_proyecto(*args, **kwargs):
+    pass
+
+
+def cambiar_password(*args, **kwargs):
+    pass
+
+
+def cambiar_rol(*args, **kwargs):
+    pass
+
+
+def cambiar_estado(*args, **kwargs):
+    pass
+
