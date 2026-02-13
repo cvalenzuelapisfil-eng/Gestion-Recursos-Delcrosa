@@ -316,38 +316,43 @@ def registrar_auditoria(uid, accion, modulo, ref, detalle):
 
 def calendario_recursos(inicio=None, fin=None):
     """
-    Devuelve asignaciones activas para el calendario
-    Compatible con pagina calendario_recursos.py
+    Devuelve asignaciones activas para el calendario y dashboard
+    Columnas EXACTAS requeridas:
+    Personal | Proyecto | Inicio | Fin
     """
     conn = get_connection()
 
     query = """
         SELECT 
-            a.id,
-            p.nombre AS personal,
-            pr.nombre AS proyecto,
-            a.inicio,
-            a.fin
+            p.nombre AS "Personal",
+            pr.nombre AS "Proyecto",
+            a.inicio AS "Inicio",
+            a.fin AS "Fin"
         FROM asignaciones a
         JOIN personal p ON p.id = a.personal_id
         JOIN proyectos pr ON pr.id = a.proyecto_id
         WHERE a.activa = TRUE
-        ORDER BY a.inicio
     """
 
-    df = pd.read_sql(query, conn)
+    params = []
+
+    if inicio and fin:
+        query += " AND a.inicio <= %s AND a.fin >= %s"
+        params = [fin, inicio]
+
+    query += " ORDER BY a.inicio"
+
+    df = pd.read_sql(query, conn, params=params)
+
     cerrar(conn)
+
+    # Seguridad extra para Dashboard
+    if not df.empty:
+        df["Inicio"] = pd.to_datetime(df["Inicio"], errors="coerce")
+        df["Fin"] = pd.to_datetime(df["Fin"], errors="coerce")
+
     return df
 
-
-def obtener_personal_dashboard():
-    """
-    Lista simple para filtros del dashboard/calendario
-    """
-    conn = get_connection()
-    df = pd.read_sql("SELECT id, nombre FROM personal ORDER BY nombre", conn)
-    cerrar(conn)
-    return df
 
 # =====================================================
 # KPI DASHBOARD
