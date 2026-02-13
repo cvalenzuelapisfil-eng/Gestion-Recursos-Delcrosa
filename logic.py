@@ -43,7 +43,6 @@ def validar_usuario(usuario, password):
         FROM usuarios
         WHERE usuario=%s
     """, (usuario,))
-
     row = cur.fetchone()
 
     if not row:
@@ -175,7 +174,6 @@ def reset_password_por_token(token, nueva_password):
         SELECT id FROM usuarios
         WHERE reset_token=%s AND reset_expira > NOW()
     """, (token,))
-
     row = cur.fetchone()
 
     if not row:
@@ -202,7 +200,11 @@ def reset_password_por_token(token, nueva_password):
 # =====================================================
 def obtener_personal():
     conn = get_connection()
-    df = pd.read_sql("SELECT id,nombre,cargo,area,activo FROM personal ORDER BY nombre", conn)
+    df = pd.read_sql("""
+        SELECT id,nombre,cargo,area,activo
+        FROM personal
+        ORDER BY nombre
+    """, conn)
     cerrar(conn)
     return df
 
@@ -293,6 +295,82 @@ def obtener_asignaciones_activas():
     return df
 
 
+# =====================================================
+# CALENDARIO / DASHBOARD DATA
+# =====================================================
+def calendario_recursos(inicio=None, fin=None):
+    conn = get_connection()
+
+    df = pd.read_sql("""
+        SELECT 
+            p.nombre AS "Personal",
+            pr.nombre AS "Proyecto",
+            a.inicio AS "Inicio",
+            a.fin AS "Fin"
+        FROM asignaciones a
+        JOIN personal p ON p.id = a.personal_id
+        JOIN proyectos pr ON pr.id = a.proyecto_id
+        WHERE a.activa = TRUE
+        ORDER BY a.inicio
+    """, conn)
+
+    cerrar(conn)
+    return df
+
+
+def obtener_personal_dashboard():
+    conn = get_connection()
+    df = pd.read_sql("SELECT id, nombre FROM personal ORDER BY nombre", conn)
+    cerrar(conn)
+    return df
+
+
+# =====================================================
+# KPI DASHBOARD
+# =====================================================
+def kpi_proyectos():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM proyectos WHERE eliminado=FALSE")
+    total = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return total, 0
+
+
+def kpi_personal():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM personal WHERE activo=TRUE")
+    total = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return total, 0, 0
+
+
+def kpi_asignaciones():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM asignaciones WHERE activa=TRUE")
+    total = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return total
+
+
+def kpi_solapamientos():
+    return 0
+
+
+def kpi_proyectos_confirmados():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT COUNT(*) 
+        FROM proyectos 
+        WHERE confirmado=TRUE AND eliminado=FALSE
+    """)
+    total = cur.fetchone()[0]
+    cerrar(conn, cur)
+    return total, 0
+
 
 # =====================================================
 # AUDITORIA
@@ -308,129 +386,4 @@ def registrar_auditoria(uid, accion, modulo, ref, detalle):
         conn.commit()
         cerrar(conn, cur)
     except:
-    pass
-
-
-# =====================================================
-# FUNCIONES COMPATIBILIDAD PAGINA CALENDARIO
-# =====================================================
-
-
-def calendario_recursos(inicio=None, fin=None):
-    """
-    Devuelve asignaciones activas para el calendario y dashboard
-    Columnas EXACTAS requeridas:
-    Personal | Proyecto | Inicio | Fin
-    """
-    conn = get_connection()
-
-    query = """
-        SELECT 
-            p.nombre AS "Personal",
-            pr.nombre AS "Proyecto",
-            a.inicio AS "Inicio",
-            a.fin AS "Fin"
-        FROM asignaciones a
-        JOIN personal p ON p.id = a.personal_id
-        JOIN proyectos pr ON pr.id = a.proyecto_id
-        WHERE a.activa = TRUE
-    """
-
-    params = []
-
-    if inicio and fin:
-        query += " AND a.inicio <= %s AND a.fin >= %s"
-        params = [fin, inicio]
-
-    query += " ORDER BY a.inicio"
-
-    df = pd.read_sql(query, conn, params=params)
-
-    cerrar(conn)
-
-    # Seguridad extra para Dashboard
-    if not df.empty:
-        df["Inicio"] = pd.to_datetime(df["Inicio"], errors="coerce")
-        df["Fin"] = pd.to_datetime(df["Fin"], errors="coerce")
-
-    return df
-
-
-# =====================================================
-# KPI DASHBOARD
-# =====================================================
-
-def kpi_proyectos():
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM proyectos WHERE eliminado=FALSE")
-        total = cur.fetchone()[0]
-        cerrar(conn, cur)
-        return total, 0
-    except:
-        return 0, 0
-
-
-def kpi_personal():
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM personal WHERE activo=TRUE")
-        total = cur.fetchone()[0]
-        cerrar(conn, cur)
-        return total, 0, 0
-    except:
-        return 0, 0, 0
-
-
-def kpi_asignaciones():
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM asignaciones WHERE activa=TRUE")
-        total = cur.fetchone()[0]
-        cerrar(conn, cur)
-        return total
-    except:
-        return 0
-
-
-def kpi_solapamientos():
-    return 0
-
-
-def kpi_proyectos_confirmados():
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM proyectos WHERE confirmado=TRUE AND eliminado=FALSE")
-        total = cur.fetchone()[0]
-        cerrar(conn, cur)
-        return total, 0
-    except:
-        return 0, 0
-
-
-# =====================================================
-# DASHBOARD DATA
-# =====================================================
-
-def obtener_alertas_por_persona(pid=None):
-    return []
-
-
-def proyectos_gantt_por_persona(pid=None):
-    try:
-        conn = get_connection()
-        df = pd.read_sql("""
-            SELECT nombre, inicio, fin
-            FROM proyectos
-            WHERE eliminado=FALSE
-        """, conn)
-        cerrar(conn)
-        return df
-    except:
-        return pd.DataFrame()
-
-
+        pass
