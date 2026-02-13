@@ -420,4 +420,35 @@ def asignar_personal(proyecto_id, personal_ids, inicio, fin, uid=None):
         except:
             pass
 
+# =====================================================
+# PROYECTOS (COMPATIBILIDAD TOTAL)
+# =====================================================
+
+def obtener_proyectos():
+    """
+    Lista de proyectos activos.
+    Compatible con Dashboard, Asignaciones y Proyectos.
+    """
+    try:
+        conn = get_connection()
+
+        df = pd.read_sql("""
+            SELECT 
+                id,
+                nombre,
+                inicio,
+                fin,
+                confirmado,
+                estado
+            FROM proyectos
+            WHERE eliminado = FALSE
+            ORDER BY inicio DESC
+        """, conn)
+
+        cerrar(conn)
+        return df
+
+    except Exception as e:
+        return pd.DataFrame()
+
     
