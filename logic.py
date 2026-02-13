@@ -628,20 +628,60 @@ def obtener_alertas_por_persona(pid=None):
 
 
 def proyectos_gantt_por_persona(pid=None):
+    """
+    Datos para Gantt del Dashboard.
+    SIEMPRE devuelve columnas:
+    Proyecto | Inicio | Fin | Confirmacion
+    """
+
     try:
         conn = get_connection()
 
-        df = pd.read_sql("""
-            SELECT nombre, inicio, fin
-            FROM proyectos
-            WHERE eliminado=FALSE
-            ORDER BY inicio
-        """, conn)
+        if pid:
+            query = """
+                SELECT 
+                    pr.nombre AS "Proyecto",
+                    pr.inicio AS "Inicio",
+                    pr.fin AS "Fin",
+                    CASE 
+                        WHEN pr.confirmado = TRUE THEN 'Confirmado'
+                        ELSE 'No confirmado'
+                    END AS "Confirmacion"
+                FROM proyectos pr
+                JOIN asignaciones a ON a.proyecto_id = pr.id
+                WHERE pr.eliminado = FALSE
+                AND a.personal_id = %s
+                ORDER BY pr.inicio
+            """
+            df = pd.read_sql(query, conn, params=(pid,))
+        else:
+            query = """
+                SELECT 
+                    nombre AS "Proyecto",
+                    inicio AS "Inicio",
+                    fin AS "Fin",
+                    CASE 
+                        WHEN confirmado = TRUE THEN 'Confirmado'
+                        ELSE 'No confirmado'
+                    END AS "Confirmacion"
+                FROM proyectos
+                WHERE eliminado = FALSE
+                ORDER BY inicio
+            """
+            df = pd.read_sql(query, conn)
 
         cerrar(conn)
+
+        # 🔒 Si no hay datos → estructura segura
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["Proyecto", "Inicio", "Fin", "Confirmacion"])
+
+        # 🔒 Asegura formato fecha
+        df["Inicio"] = pd.to_datetime(df["Inicio"], errors="coerce")
+        df["Fin"] = pd.to_datetime(df["Fin"], errors="coerce")
+
         return df
 
-    except:
-        return pd.DataFrame()
-
+    except Exception as e:
+        return pd.DataFrame(columns=["Proyecto", "Inicio", "Fin", "Confirmacion"])
 
