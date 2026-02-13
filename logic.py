@@ -341,4 +341,83 @@ def obtener_asignaciones():
     except:
         return pd.DataFrame()
 
+# =====================================================
+# IA / MOTOR ASIGNACION (COMPATIBILIDAD ERP ULTRA)
+# =====================================================
+
+def obtener_carga_personal(pid):
+    """
+    Calcula % de carga del personal según asignaciones activas.
+    Fórmula simple y estable para evitar errores.
+    """
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM asignaciones
+            WHERE personal_id=%s AND activa=TRUE
+        """, (pid,))
+
+        total = cur.fetchone()[0]
+        cerrar(conn, cur)
+
+        # Escala simple: 0 asignaciones = 0%, 1 = 25%, 2 = 50%, 3 = 75%, 4+ = 100%
+        carga = min(total * 25, 100)
+        return carga
+
+    except:
+        return 0
+
+
+def sugerir_personal(inicio, fin, cantidad=1):
+    """
+    Motor inteligente simple:
+    Devuelve personal disponible ordenado por menor carga.
+    """
+    try:
+        df = obtener_personal_disponible(inicio, fin)
+        if df.empty:
+            return df
+
+        df["carga"] = df["id"].apply(obtener_carga_personal)
+        df = df.sort_values("carga")
+
+        return df.head(cantidad)
+
+    except:
+        return pd.DataFrame()
+
+
+# =====================================================
+# FIX FIRMA asignar_personal (COMPATIBLE CON PAGINAS)
+# =====================================================
+
+def asignar_personal(proyecto_id, personal_ids, inicio, fin, uid=None):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    for pid in personal_ids:
+        cur.execute("""
+            INSERT INTO asignaciones(personal_id,proyecto_id,inicio,fin,activa)
+            VALUES(%s,%s,%s,%s,TRUE)
+        """, (pid, proyecto_id, inicio, fin))
+
+    conn.commit()
+    cerrar(conn, cur)
+
+    # Auditoría automática si se pasa usuario
+    if uid:
+        try:
+            registrar_auditoria(
+                uid,
+                "ASIGNAR_PERSONAL",
+                "ASIGNACIONES",
+                proyecto_id,
+                f"{len(personal_ids)} personas asignadas"
+            )
+        except:
+            pass
+
     
