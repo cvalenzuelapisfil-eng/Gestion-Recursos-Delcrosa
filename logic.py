@@ -308,11 +308,13 @@ def registrar_auditoria(uid, accion, modulo, ref, detalle):
         conn.commit()
         cerrar(conn, cur)
     except:
-        pass
+    pass
 
-    # =====================================================
+
+# =====================================================
 # FUNCIONES COMPATIBILIDAD PAGINA CALENDARIO
 # =====================================================
+
 
 def calendario_recursos(inicio=None, fin=None):
     """
