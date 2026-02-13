@@ -629,10 +629,13 @@ def obtener_alertas_por_persona(pid=None):
 
 def proyectos_gantt_por_persona(pid=None):
     """
-    Datos para Gantt del Dashboard.
-    SIEMPRE devuelve columnas:
+    Datos Gantt compatibles con Plotly.
+    SIEMPRE devuelve:
     Proyecto | Inicio | Fin | Confirmacion
+    Nunca rompe el Dashboard.
     """
+
+    columnas = ["Proyecto", "Inicio", "Fin", "Confirmacion"]
 
     try:
         conn = get_connection()
@@ -672,16 +675,33 @@ def proyectos_gantt_por_persona(pid=None):
 
         cerrar(conn)
 
-        # 🔒 Si no hay datos → estructura segura
-        if df is None or df.empty:
-            return pd.DataFrame(columns=["Proyecto", "Inicio", "Fin", "Confirmacion"])
+        # 🔒 Si viene None → estructura segura
+        if df is None:
+            return pd.DataFrame(columns=columnas)
 
-        # 🔒 Asegura formato fecha
+        # 🔒 Si vacío → estructura segura
+        if df.empty:
+            return pd.DataFrame(columns=columnas)
+
+        # 🔒 Forzar columnas correctas
+        for c in columnas:
+            if c not in df.columns:
+                df[c] = None
+
+        df = df[columnas]
+
+        # 🔒 Convertir fechas sin romper
         df["Inicio"] = pd.to_datetime(df["Inicio"], errors="coerce")
         df["Fin"] = pd.to_datetime(df["Fin"], errors="coerce")
+
+        # 🔒 Quitar filas corruptas
+        df = df.dropna(subset=["Inicio", "Fin"])
+
+        # 🔒 Si todo quedó vacío → devolver estructura válida
+        if df.empty:
+            return pd.DataFrame(columns=columnas)
 
         return df
 
     except Exception as e:
-        return pd.DataFrame(columns=["Proyecto", "Inicio", "Fin", "Confirmacion"])
-
+        return pd.DataFrame(columns=columnas)
