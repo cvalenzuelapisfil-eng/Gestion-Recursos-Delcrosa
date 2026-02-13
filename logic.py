@@ -267,18 +267,32 @@ def calendario_recursos(inicio=None, fin=None):
 
 def obtener_personal_dashboard():
     """
-    Lista simple para filtros del calendario/dashboard.
+    Lista personal para filtros Dashboard.
+    SIEMPRE devuelve columna 'nombre' aunque no haya datos.
     """
     try:
         conn = get_connection()
-        df = pd.read_sql(
-            "SELECT id, nombre FROM personal WHERE activo=TRUE ORDER BY nombre",
-            conn
-        )
+
+        df = pd.read_sql("""
+            SELECT id, nombre
+            FROM personal
+            WHERE activo = TRUE
+            ORDER BY nombre
+        """, conn)
+
         cerrar(conn)
+
+        # 🔒 Garantiza estructura aunque esté vacío
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["id", "nombre"])
+
+        # 🔒 Normaliza nombres columnas
+        df.columns = [c.lower() for c in df.columns]
+
         return df
-    except:
-        return pd.DataFrame()
+
+    except Exception as e:
+        return pd.DataFrame(columns=["id", "nombre"])
 
 # =====================================================
 # COMPATIBILIDAD PAGINA ASIGNACIONES (NO BORRAR)
