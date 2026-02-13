@@ -280,4 +280,65 @@ def obtener_personal_dashboard():
     except:
         return pd.DataFrame()
 
+# =====================================================
+# COMPATIBILIDAD PAGINA ASIGNACIONES (NO BORRAR)
+# =====================================================
+
+def obtener_personal_disponible(inicio, fin):
+    """
+    Personal libre en un rango de fechas.
+    Compatible con pages/asignaciones.py
+    """
+    try:
+        conn = get_connection()
+
+        query = """
+            SELECT id, nombre
+            FROM personal
+            WHERE activo = TRUE
+            AND id NOT IN (
+                SELECT personal_id
+                FROM asignaciones
+                WHERE activa = TRUE
+                AND inicio <= %s
+                AND fin >= %s
+            )
+            ORDER BY nombre
+        """
+
+        df = pd.read_sql(query, conn, params=(fin, inicio))
+        cerrar(conn)
+        return df
+
+    except Exception as e:
+        return pd.DataFrame()
+
+
+def obtener_asignaciones():
+    """
+    Lista completa de asignaciones.
+    """
+    try:
+        conn = get_connection()
+
+        df = pd.read_sql("""
+            SELECT 
+                a.id,
+                p.nombre AS "Personal",
+                pr.nombre AS "Proyecto",
+                a.inicio AS "Inicio",
+                a.fin AS "Fin",
+                a.activa
+            FROM asignaciones a
+            JOIN personal p ON p.id = a.personal_id
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            ORDER BY a.inicio
+        """, conn)
+
+        cerrar(conn)
+        return df
+
+    except:
+        return pd.DataFrame()
+
     
