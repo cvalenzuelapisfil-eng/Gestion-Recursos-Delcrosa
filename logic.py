@@ -578,3 +578,56 @@ def hay_solapamiento(pid, inicio, fin):
     except:
         return False
 
+
+# =====================================================
+# KPI EXTRA DASHBOARD
+# =====================================================
+
+def kpi_proyectos_confirmados():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM proyectos
+            WHERE confirmado=TRUE AND eliminado=FALSE
+        """)
+        total = cur.fetchone()[0]
+        cerrar(conn, cur)
+        return total, 0
+    except:
+        return 0, 0
+
+
+def kpi_solapamientos():
+    # Puedes mejorarlo luego — ahora evita que rompa Dashboard
+    return 0
+
+
+# =====================================================
+# DATA EXTRA DASHBOARD
+# =====================================================
+
+def obtener_alertas_por_persona(pid=None):
+    # Placeholder estable — evita crash
+    return []
+
+
+def proyectos_gantt_por_persona(pid=None):
+    try:
+        conn = get_connection()
+
+        df = pd.read_sql("""
+            SELECT nombre, inicio, fin
+            FROM proyectos
+            WHERE eliminado=FALSE
+            ORDER BY inicio
+        """, conn)
+
+        cerrar(conn)
+        return df
+
+    except:
+        return pd.DataFrame()
+
+
