@@ -277,20 +277,21 @@ def hay_solapamiento(pid, inicio, fin):
 
 def obtener_asignaciones_activas():
     conn = get_connection()
-
     df = pd.read_sql("""
-        SELECT p.nombre AS personal,
-               pr.nombre AS proyecto,
-               a.inicio,
-               a.fin
+        SELECT 
+            p.nombre AS "Personal",
+            pr.nombre AS "Proyecto",
+            a.inicio AS "Inicio",
+            a.fin AS "Fin"
         FROM asignaciones a
-        JOIN personal p ON p.id=a.personal_id
-        JOIN proyectos pr ON pr.id=a.proyecto_id
-        WHERE a.activa=TRUE
+        JOIN personal p ON p.id = a.personal_id
+        JOIN proyectos pr ON pr.id = a.proyecto_id
+        WHERE a.activa = TRUE
+        ORDER BY a.inicio
     """, conn)
-
     cerrar(conn)
     return df
+
 
 
 # =====================================================
