@@ -231,3 +231,53 @@ def registrar_auditoria(uid, accion, modulo, ref, detalle):
 
     except:
         pass
+# =====================================================
+# COMPATIBILIDAD CALENDARIO (NO BORRAR)
+# =====================================================
+
+def calendario_recursos(inicio=None, fin=None):
+    """
+    Devuelve asignaciones activas para calendario.
+    Compatible con pages/calendario_recursos.py
+    """
+    try:
+        conn = get_connection()
+
+        query = """
+            SELECT 
+                a.id,
+                p.nombre AS "Personal",
+                pr.nombre AS "Proyecto",
+                a.inicio AS "Inicio",
+                a.fin AS "Fin"
+            FROM asignaciones a
+            JOIN personal p ON p.id = a.personal_id
+            JOIN proyectos pr ON pr.id = a.proyecto_id
+            WHERE a.activa = TRUE
+            ORDER BY a.inicio
+        """
+
+        df = pd.read_sql(query, conn)
+        cerrar(conn)
+        return df
+
+    except Exception as e:
+        return pd.DataFrame()
+
+
+def obtener_personal_dashboard():
+    """
+    Lista simple para filtros del calendario/dashboard.
+    """
+    try:
+        conn = get_connection()
+        df = pd.read_sql(
+            "SELECT id, nombre FROM personal WHERE activo=TRUE ORDER BY nombre",
+            conn
+        )
+        cerrar(conn)
+        return df
+    except:
+        return pd.DataFrame()
+
+    
