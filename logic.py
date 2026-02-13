@@ -348,3 +348,81 @@ def obtener_personal_dashboard():
     cerrar(conn)
     return df
 
+# =====================================================
+# KPI DASHBOARD
+# =====================================================
+
+def kpi_proyectos():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM proyectos WHERE eliminado=FALSE")
+        total = cur.fetchone()[0]
+        cerrar(conn, cur)
+        return total, 0
+    except:
+        return 0, 0
+
+
+def kpi_personal():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM personal WHERE activo=TRUE")
+        total = cur.fetchone()[0]
+        cerrar(conn, cur)
+        return total, 0, 0
+    except:
+        return 0, 0, 0
+
+
+def kpi_asignaciones():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM asignaciones WHERE activa=TRUE")
+        total = cur.fetchone()[0]
+        cerrar(conn, cur)
+        return total
+    except:
+        return 0
+
+
+def kpi_solapamientos():
+    return 0
+
+
+def kpi_proyectos_confirmados():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM proyectos WHERE confirmado=TRUE AND eliminado=FALSE")
+        total = cur.fetchone()[0]
+        cerrar(conn, cur)
+        return total, 0
+    except:
+        return 0, 0
+
+
+# =====================================================
+# DASHBOARD DATA
+# =====================================================
+
+def obtener_alertas_por_persona(pid=None):
+    return []
+
+
+def proyectos_gantt_por_persona(pid=None):
+    try:
+        conn = get_connection()
+        df = pd.read_sql("""
+            SELECT nombre, inicio, fin
+            FROM proyectos
+            WHERE eliminado=FALSE
+        """, conn)
+        cerrar(conn)
+        return df
+    except:
+        return pd.DataFrame()
+
+
