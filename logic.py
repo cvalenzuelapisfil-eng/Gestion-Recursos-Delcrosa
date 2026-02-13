@@ -451,4 +451,130 @@ def obtener_proyectos():
     except Exception as e:
         return pd.DataFrame()
 
-    
+# =====================================================
+# PROYECTOS CRUD (COMPATIBLE CON pages/proyectos.py)
+# =====================================================
+
+def crear_proyecto(nombre, inicio, fin, confirmado=False, uid=None):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO proyectos(nombre, inicio, fin, confirmado, estado, eliminado)
+            VALUES(%s, %s, %s, %s, 'Activo', FALSE)
+        """, (nombre, inicio, fin, confirmado))
+
+        conn.commit()
+        cerrar(conn, cur)
+
+        if uid:
+            registrar_auditoria(uid, "CREAR_PROYECTO", "PROYECTOS", None, nombre)
+
+    except:
+        pass
+
+
+def modificar_proyecto(pid, nombre, inicio, fin, confirmado, uid=None):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE proyectos
+            SET nombre=%s, inicio=%s, fin=%s, confirmado=%s
+            WHERE id=%s
+        """, (nombre, inicio, fin, confirmado, pid))
+
+        conn.commit()
+        cerrar(conn, cur)
+
+        if uid:
+            registrar_auditoria(uid, "MODIFICAR_PROYECTO", "PROYECTOS", pid, nombre)
+
+    except:
+        pass
+
+
+def eliminar_proyecto(pid, uid=None):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("UPDATE proyectos SET eliminado=TRUE WHERE id=%s", (pid,))
+
+        conn.commit()
+        cerrar(conn, cur)
+
+        if uid:
+            registrar_auditoria(uid, "ELIMINAR_PROYECTO", "PROYECTOS", pid, "")
+
+    except:
+        pass
+
+
+# =====================================================
+# DASHBOARD KPI (COMPATIBLE CON Dashboard.py)
+# =====================================================
+
+def kpi_proyectos():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM proyectos WHERE eliminado=FALSE")
+        total = cur.fetchone()[0]
+        cerrar(conn, cur)
+        return total, 0
+    except:
+        return 0, 0
+
+
+def kpi_personal():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM personal WHERE activo=TRUE")
+        total = cur.fetchone()[0]
+        cerrar(conn, cur)
+        return total, 0, 0
+    except:
+        return 0, 0, 0
+
+
+def kpi_asignaciones():
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM asignaciones WHERE activa=TRUE")
+        total = cur.fetchone()[0]
+        cerrar(conn, cur)
+        return total
+    except:
+        return 0
+
+
+# =====================================================
+# FIX SOLAPAMIENTO (ASIGNACIONES)
+# =====================================================
+
+def hay_solapamiento(pid, inicio, fin):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM asignaciones
+            WHERE personal_id=%s
+            AND activa=TRUE
+            AND inicio <= %s
+            AND fin >= %s
+        """, (pid, fin, inicio))
+
+        res = cur.fetchone()[0] > 0
+        cerrar(conn, cur)
+        return res
+
+    except:
+        return False
+
